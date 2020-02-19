@@ -10,6 +10,9 @@ namespace JackCompiler
 	{
 		Token token;
 
+		//getting a new token so set the value of cachedNextToken to show it is no longer valid
+		m_cachedNextToken.m_tokenType = Token::TokenType::NONE;
+
 		//Consume the leading whitespace
 		consumeWhiteSpace();
 		//Move file pointer to start of the next token
@@ -48,9 +51,13 @@ namespace JackCompiler
 
 	Token Lexer::peakNextToken()
 	{
+		if (m_cachedNextToken.m_tokenType != Token::TokenType::NONE)
+			return m_cachedNextToken;
+
 		int currentFilePointer = m_fileStream.tellg();
 		Token token = getNextToken();
 		m_fileStream.seekg(currentFilePointer);
+		m_cachedNextToken = token;
 		return token;
 	}
 

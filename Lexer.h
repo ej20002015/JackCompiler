@@ -18,7 +18,7 @@ namespace JackCompiler
 	class Lexer : public LexerInterface
 	{
 	public:
-		Lexer(std::string& filePath) : m_lineNum(1), m_fileStream(filePath, std::fstream::in | std::ios_base::binary) {}
+		Lexer(std::string& filePath) : m_lineNum(1), m_fileStream(filePath, std::fstream::in | std::ios_base::binary), m_cachedNextToken() {}
 		~Lexer() { m_fileStream.close(); }
 		Token getNextToken() override;
 		Token peakNextToken() override;
@@ -34,6 +34,9 @@ namespace JackCompiler
 		bool checkSymbol(Token& token);
 		unsigned m_lineNum;
 		std::fstream m_fileStream;
+		//cache the next token when calling peak to improve 
+		//performance if multiple peak calls are made successively
+		Token m_cachedNextToken;
 
 		const std::vector<std::string> m_keywords
 		{
