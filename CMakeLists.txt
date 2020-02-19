@@ -6,8 +6,12 @@ cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_FLAGS "-lm -std=c++17")
 
+link_libraries(stdc++fs)
+
 add_executable(JackCompiler
     main.cpp
     Compiler.cpp
     Lexer.cpp
 )
+
+set_property(TARGET JackCompiler PROPERTY CXX_STANDARD 17)
