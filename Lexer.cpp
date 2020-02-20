@@ -63,7 +63,6 @@ namespace JackCompiler
 	void Lexer::consumeWhiteSpace()
 	{
 		char nextChar;
-		int num = m_fileStream.tellg();
 		for (nextChar = m_fileStream.peek(); (nextChar != -1) && std::isspace(nextChar); m_fileStream.get(), nextChar = m_fileStream.peek())
 		{
 			if (nextChar == '\n')
