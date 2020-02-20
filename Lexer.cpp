@@ -48,7 +48,7 @@ namespace JackCompiler
 		exit(8);
 	}
 
-	Token Lexer::peakNextToken()
+	Token Lexer::peekNextToken()
 	{
 		if (m_cachedNextToken.m_tokenType != Token::TokenType::NONE)
 			return m_cachedNextToken;
