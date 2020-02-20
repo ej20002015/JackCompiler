@@ -1,7 +1,7 @@
 #include "Compiler.h"
 
 #include <iostream>
-#include <filesystem>
+#include <dirent.h>
 
 #include "Core.h"
 #include "Lexer.h"
@@ -19,25 +19,20 @@ namespace JackCompiler
 		else
 			directoryPath = argv[1];
 
-		if (!std::filesystem::is_directory(directoryPath))
+		DIR* directory;
+		struct dirent* entry;
+		directory = opendir(directoryPath.c_str());
+		if (directory == NULL)
 		{
 			COMPILEERROR("No directory exists with the name \"" + directoryPath + "\"")
 			return 2;
 		}
 
-		try
+		for (entry = readdir(directory); entry != NULL; entry = readdir(directory))
 		{
-			for (const auto& file : std::filesystem::directory_iterator(directoryPath))
-			{
-				std::string fileString = file.path().string();
-				if (fileString.substr(fileString.find_last_of(".") + 1) == "jack")
-					filePaths.push_back(fileString);
-			}
-		}
-		catch (std::filesystem::filesystem_error& error)
-		{
-			COMPILEERROR("Error with filesystem -> " + std::string(error.what()))
-			return 3;
+			std::string fileString = directoryPath + "/" + entry->d_name;
+			if (fileString.substr(fileString.find_last_of(".") + 1) == "jack")
+				filePaths.push_back(fileString);
 		}
 
 		if (filePaths.empty())

@@ -24,7 +24,6 @@ namespace JackCompiler
 		//check if EOF marker has been reached
 		if (nextChar == EOF)
 		{
-			m_fileStream.get();
 			token.m_tokenType = Token::TokenType::EOFILE;
 			return token;
 		}
