@@ -44,8 +44,7 @@ namespace JackCompiler
 		if (checkSymbol(token))
 			return token;
 
-		COMPILEERROR("(LINE " + std::to_string(m_lineNum) + ") Invalid token beginning with " + std::string(1, m_fileStream.peek()))
-		exit(8);
+		compilerError("Invalid token beginning with " + std::string(1, m_fileStream.peek()));
 	}
 
 	Token Lexer::peekNextToken()
@@ -221,10 +220,7 @@ namespace JackCompiler
 		if (state == 4)
 			consumedComment = true;
 		else if (state == 5)
-		{
-			COMPILEERROR("(LINE " + std::to_string(openingCommentLine) + ") No matching ending comment token exists for the opening comment token on this line")
-			exit(5);
-		}
+			compilerError("No matching ending comment token exists for the opening comment token on this line");
 		else
 			m_fileStream.seekg(currentFilePointer);
 
@@ -392,15 +388,9 @@ namespace JackCompiler
 		}
 
 		if (state == 2)
-		{
-			COMPILEERROR("(LINE " + std::to_string(m_lineNum) + ") No terminating \" for string constant")
-			exit(6);
-		}
+			compilerError("No terminating \" for string constant");
 		else if (state == 3)
-		{
-			COMPILEERROR("(LINE " + std::to_string(m_lineNum) + ") New line characters are not permitted in string constants")
-			exit(7);
-		}
+			compilerError("New line characters are not permitted in string constants");
 		else if (state == 5)
 		{
 			//consume the ending "

@@ -3,11 +3,11 @@
 #include <iostream>
 #include <map>
 
-#define COMPILEERROR(str) \
-	std::cout << "COMPILATION ERROR: " << str << " - ending compilation" << std::endl;
-
 namespace JackCompiler
 {
+	void compilerError(std::string message);
+	void compilerError(std::string message, int lineNum);
+
 	struct Token
 	{
 		enum class TokenType
@@ -21,17 +21,7 @@ namespace JackCompiler
 			IDENTIFIER
 		};
 
-		Token() : m_tokenType(TokenType::NONE), m_lexeme("")
-		{
-			m_tokenTypeMapping[TokenType::NONE]            = "NONE";
-			m_tokenTypeMapping[TokenType::EOFILE]          = "EOF";
-			m_tokenTypeMapping[TokenType::SYMBOL]          = "SYMBOL";
-			m_tokenTypeMapping[TokenType::KEYWORD]         = "KEYWORD";
-			m_tokenTypeMapping[TokenType::INTEGERCONSTANT] = "INTEGERCONSTANT";
-			m_tokenTypeMapping[TokenType::STRINGCONSTANT]  = "STRINGCONSTANT";
-			m_tokenTypeMapping[TokenType::IDENTIFIER]      = "IDENTIFIER";
-		};
-
+		Token();
 		TokenType m_tokenType;
 		std::string m_lexeme;
 		std::map<TokenType, std::string> m_tokenTypeMapping;

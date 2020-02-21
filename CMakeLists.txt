@@ -10,6 +10,7 @@ add_executable(JackCompiler
     main.cpp
     Compiler.cpp
     Lexer.cpp
+    Core.cpp
 )
 
 set_property(TARGET JackCompiler PROPERTY CXX_STANDARD 11)

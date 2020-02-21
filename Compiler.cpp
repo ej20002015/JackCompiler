@@ -12,10 +12,7 @@ namespace JackCompiler
 	{
 		std::string directoryPath = "";
 		if (argc < 2)
-		{
-			COMPILEERROR("No directory name supplied")
-			return 1;
-		}
+			compilerError("No directory name supplied");
 		else
 			directoryPath = argv[1];
 
@@ -23,10 +20,7 @@ namespace JackCompiler
 		struct dirent* entry;
 		directory = opendir(directoryPath.c_str());
 		if (directory == NULL)
-		{
-			COMPILEERROR("No directory exists with the name \"" + directoryPath + "\"")
-			return 2;
-		}
+			compilerError("No directory exists with the name \"" + directoryPath + "\"");
 
 		for (entry = readdir(directory); entry != NULL; entry = readdir(directory))
 		{
@@ -36,10 +30,7 @@ namespace JackCompiler
 		}
 
 		if (filePaths.empty())
-		{
-			COMPILEERROR("Directory does not contain any jack files")
-			return 4;
-		}
+			compilerError("Directory does not contain any jack files");
 
 		for (std::string filePath : filePaths)
 			compileFile(filePath);
