@@ -31,6 +31,11 @@ namespace JackCompiler
     void expression();
     void subroutineCall();
     void expressionList();
+    void relationalExpression();
+    void arithmeticExpression();
+    void term();
+    void factor();
+    void operand();
     bool isExpression(const Token& token);
 
     const std::vector<std::string> m_possibleStartTokensOfExpression

@@ -353,7 +353,14 @@ namespace JackCompiler
 
   void Parser::expression()
   {
-    m_lexer.getNextToken();
+    relationalExpression();
+    Token nextToken = m_lexer.peekNextToken();
+    while (nextToken.m_lexeme == "&" || nextToken.m_lexeme == "|")
+    {
+      m_lexer.getNextToken();
+      relationalExpression();
+      nextToken = m_lexer.peekNextToken();
+    }
   }
 
   void Parser::subroutineCall()
@@ -390,7 +397,140 @@ namespace JackCompiler
 
   void Parser::expressionList()
   {
-    m_lexer.getNextToken();
+    Token nextToken = m_lexer.peekNextToken();
+    if (isExpression(nextToken))
+    {
+      expression();
+      while ((nextToken = m_lexer.peekNextToken()).m_lexeme == ",")
+      {
+        m_lexer.getNextToken();
+        expression();
+      }
+    }
+  }
+
+  void Parser::relationalExpression()
+  {
+    arithmeticExpression();
+    Token nextToken = m_lexer.peekNextToken();
+    while (nextToken.m_lexeme == "=" || nextToken.m_lexeme == ">" || nextToken.m_lexeme == "<")
+    {
+      m_lexer.getNextToken();
+      arithmeticExpression();
+      nextToken = m_lexer.peekNextToken();
+    }
+  }
+
+  void Parser::arithmeticExpression()
+  {
+    term();
+    Token nextToken = m_lexer.peekNextToken();
+    while (nextToken.m_lexeme == "+" || nextToken.m_lexeme == "-")
+    {
+      m_lexer.getNextToken();
+      term();
+      nextToken = m_lexer.peekNextToken();
+    }
+  }
+
+  void Parser::term()
+  {
+    factor();
+    Token nextToken = m_lexer.peekNextToken();
+    while (nextToken.m_lexeme == "*" || nextToken.m_lexeme == "/")
+    {
+      m_lexer.getNextToken();
+      factor();
+      nextToken = m_lexer.peekNextToken();
+    }
+  }
+
+  void Parser::factor()
+  {
+    Token nextToken = m_lexer.peekNextToken();
+    if (nextToken.m_lexeme == "-" || nextToken.m_lexeme == "~")
+    {
+      m_lexer.getNextToken();
+    }
+    operand();
+  }
+
+  void Parser::operand()
+  {
+    Token nextToken = m_lexer.peekNextToken();
+    if (nextToken.m_tokenType == Token::TokenType::INTEGERCONSTANT)
+    {
+      m_lexer.getNextToken();
+    }
+    else if (nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
+    {
+      m_lexer.getNextToken();
+      if ((nextToken = m_lexer.peekNextToken()).m_lexeme == ".")
+      {
+        m_lexer.getNextToken();
+        Token token = m_lexer.getNextToken();
+        if (token.m_tokenType == Token::TokenType::IDENTIFIER)
+        {
+        }
+        else
+          compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
+        
+        nextToken = m_lexer.peekNextToken();
+        if (nextToken.m_lexeme == "[")
+        {
+          m_lexer.getNextToken();
+          expression();
+          if ((token = m_lexer.getNextToken()).m_lexeme == "]")
+          {
+          }
+          else
+            compilerError("Expected the SYMBOL ']' at this position", m_lexer.getLineNum(), token.m_lexeme);
+        }
+        else if (nextToken.m_lexeme == "(")
+        {
+          m_lexer.getNextToken();
+          expressionList();
+          if ((token = m_lexer.getNextToken()).m_lexeme == ")")
+          {
+          }
+          else
+            compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
+        }
+      }
+    }
+    else if (nextToken.m_lexeme == "(")
+    {
+      m_lexer.getNextToken();
+      expression();
+      Token token = m_lexer.getNextToken();
+      if (token.m_lexeme == ")")
+      {
+      }
+      else
+        compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else if (nextToken.m_tokenType == Token::TokenType::STRINGCONSTANT)
+    {
+      m_lexer.getNextToken();
+    }
+    else if (nextToken.m_lexeme == "true")
+    {
+      m_lexer.getNextToken();
+    }
+    else if (nextToken.m_lexeme == "false")
+    {
+      m_lexer.getNextToken();
+    }
+    else if (nextToken.m_lexeme == "null")
+    {
+      m_lexer.getNextToken();
+    }
+    else if (nextToken.m_lexeme == "this")
+    {
+      m_lexer.getNextToken();
+    }
+    else
+      compilerError("Expected an INTEGERCONSTANT, an IDENTIFIER, the SYMBOL '(', a STRINGCONSTANT, the KEYWORD 'true', the KEYWORD 'false', the KEYWORD 'null' or the KEYWORD 'this' at this position", m_lexer.getLineNum(), nextToken.m_lexeme);
   }
 
   bool Parser::isExpression(const Token& token)
