@@ -2,15 +2,21 @@
 
 namespace JackCompiler
 {
-  void compilerError(std::string message)
+  void compilerError(const std::string& message)
 	{
 		std::cout << "COMPILATION ERROR: " << message << " - ending compilation" << std::endl;
 		exit(1);
 	}
 
-	void compilerError(std::string message, int lineNum)
+	void compilerError(const std::string& message, int lineNum)
 	{
 		std::cout << "COMPILATION ERROR: (LINE " << lineNum << ") " << message << " - ending compilation" << std::endl;
+		exit(1);
+	}
+
+	void compilerError(const std::string& message, unsigned lineNum, const std::string& lexeme)
+	{
+		std::cout << "COMPILATION ERROR: (LINE " << lineNum << ") (AT TOKEN '" << lexeme << "') " << message << " - ending compilation" << std::endl;
 		exit(1);
 	}
 

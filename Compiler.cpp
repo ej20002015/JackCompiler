@@ -5,6 +5,7 @@
 
 #include "Core.h"
 #include "Lexer.h"
+#include "Parser.h"
 
 namespace JackCompiler
 {
@@ -43,13 +44,8 @@ namespace JackCompiler
 	{
 		std::cout << "Compiling file " << filePath << "..." << std::endl;
 		std::cout << std::endl;
-		Lexer lexer(filePath);
-		Token token;
-		while (token.m_tokenType != Token::TokenType::EOFILE)
-		{
-			token = lexer.getNextToken();
-			std::cout << token << std::endl;
-		}
+		Parser parser(filePath);
+		parser.parse();
 		std::cout << std::endl;
 	}
 }

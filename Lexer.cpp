@@ -10,6 +10,12 @@ namespace JackCompiler
 	{
 		Token token;
 
+		int currentLineNum = -1;
+
+		//if next token has already been peeked then the m_lineNum will have already been updated so keep it constant
+		if (m_cachedNextToken.m_tokenType != Token::TokenType::NONE)
+			currentLineNum = m_lineNum;
+
 		//getting a new token so set the value of cachedNextToken to show it is no longer valid
 		m_cachedNextToken.m_tokenType = Token::TokenType::NONE;
 
@@ -30,21 +36,22 @@ namespace JackCompiler
 
 		//check if token is an identifier or keyword
 		if (checkIdentifierOrKeyword(token))
-			return token;
-
+			;
 		//check if token is an integer constant
-		if (checkIntegerConstant(token))
-			return token;
-
+		else if (checkIntegerConstant(token))
+			;
 		//check if token is a string constant
-		if (checkStringConstant(token))
-			return token;
-
+		else if (checkStringConstant(token))
+			;
 		//check if token is a symbol
-		if (checkSymbol(token))
-			return token;
-
-		compilerError("Invalid token beginning with " + std::string(1, m_fileStream.peek()));
+		else if (checkSymbol(token))
+			;
+		else
+			compilerError("Invalid token beginning with " + std::string(1, m_fileStream.peek()));
+		
+		if (currentLineNum != -1)
+			m_lineNum = currentLineNum;
+		return token;
 	}
 
 	Token Lexer::peekNextToken()

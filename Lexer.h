@@ -18,10 +18,11 @@ namespace JackCompiler
 	class Lexer : public LexerInterface
 	{
 	public:
-		Lexer(std::string& filePath) : m_lineNum(1), m_fileStream(filePath, std::fstream::in | std::ios_base::binary), m_cachedNextToken() {}
+		Lexer(const std::string& filePath) : m_lineNum(1), m_fileStream(filePath, std::fstream::in | std::ios_base::binary), m_cachedNextToken() {}
 		~Lexer() { m_fileStream.close(); }
 		Token getNextToken() override;
 		Token peekNextToken() override;
+		unsigned getLineNum() const { return m_lineNum; }
 
 	private:
 		void consumeWhiteSpace();
