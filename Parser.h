@@ -20,7 +20,7 @@ namespace JackCompiler
     void subroutineDefinition();
     void type();
     void parameterList();
-    void subroutineBody();
+    void body();
     void statement();
     void variableDeclarationStatement();
     void letStatement();
@@ -28,5 +28,20 @@ namespace JackCompiler
     void whileStatement();
     void doStatement();
     void returnStatement();
+    void expression();
+    void subroutineCall();
+    void expressionList();
+    bool isExpression(const Token& token);
+
+    const std::vector<std::string> m_possibleStartTokensOfExpression
+    {
+      "-",
+      "~",
+      "(",
+      "true",
+      "false",
+      "null",
+      "this"
+    };
   };
 }

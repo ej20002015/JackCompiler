@@ -1,4 +1,5 @@
 #include "Parser.h"
+#include <algorithm>
 
 namespace JackCompiler
 {
@@ -98,14 +99,12 @@ namespace JackCompiler
     {
       Token nextToken = m_lexer.peekNextToken();
       if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || token.m_tokenType == Token::TokenType::IDENTIFIER)
-      {
         type();
-      }
       else if ((token = m_lexer.getNextToken()).m_lexeme == "void")
       {
       }
       else
-        compilerError("Expected the KEYWORD 'int', the KEYWORD 'char', the KEYWORD 'boolean', an IDENTIFIER or the KEYWORD 'void' at this position", m_lexer.getLineNum(), token.m_lexeme);  
+        compilerError("Expected the KEYWORD 'int', the KEYWORD 'char', the KEYWORD 'boolean', an IDENTIFIER or the KEYWORD 'void' at this position", m_lexer.getLineNum(), nextToken.m_lexeme);  
       
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
@@ -113,9 +112,7 @@ namespace JackCompiler
         {
           parameterList();
           if ((token = m_lexer.getNextToken()).m_lexeme == ")")
-          {
-            subroutineBody();
-          } 
+            body();
           else
             compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);  
         }
@@ -164,7 +161,7 @@ namespace JackCompiler
     }
   }
 
-  void Parser::subroutineBody()
+  void Parser::body()
   {
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "{")
@@ -187,62 +184,222 @@ namespace JackCompiler
 
   void Parser::statement()
   {
-    Token token = m_lexer.getNextToken();
-    if (token.m_lexeme == "var")
-    {
+    Token nextToken = m_lexer.peekNextToken();
+    if (nextToken.m_lexeme == "var")
       variableDeclarationStatement();
-    }
-    else if (token.m_lexeme == "let")
-    {
+    else if (nextToken.m_lexeme == "let")
       letStatement();
-    }
-    else if (token.m_lexeme == "if")
-    {
+    else if (nextToken.m_lexeme == "if")
       ifStatement();
-    }
-    else if (token.m_lexeme == "while")
-    {
+    else if (nextToken.m_lexeme == "while")
       whileStatement();
-    }
-    else if (token.m_lexeme == "do")
-    {
+    else if (nextToken.m_lexeme == "do")
       doStatement();
-    }
-    else if (token.m_lexeme == "return")
-    {
+    else if (nextToken.m_lexeme == "return")
       returnStatement();
-    }
     else
-      compilerError("Expected the KEYWORD 'var', the KEYWORD 'let', the KEYWORD 'if', the KEYWORD 'while', the KEYWORD 'do' or the KEYWORD 'return' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      compilerError("Expected the KEYWORD 'var', the KEYWORD 'let', the KEYWORD 'if', the KEYWORD 'while', the KEYWORD 'do' or the KEYWORD 'return' at this position", m_lexer.getLineNum(), nextToken.m_lexeme);
   }
 
   void Parser::variableDeclarationStatement()
   {
-
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "var")
+    {
+      type();
+      if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
+      {
+        while ((token = m_lexer.getNextToken()).m_lexeme == ",")
+        {
+          if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
+          {
+          }
+          else
+            compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);    
+        }
+        if (token.m_lexeme == ";")
+        {
+        }
+        else
+          compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else
+        compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'var' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::letStatement()
   {
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "let")
+    {
+      if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
+      {
+        Token nextToken = m_lexer.peekNextToken();
+        if (nextToken.m_lexeme == "[")
+        {
+          m_lexer.getNextToken();
+          expression();
+          if ((token = m_lexer.getNextToken()).m_lexeme == "]")
+          {
+          }
+          else
+            compilerError("Expected the SYMBOL ']' at this position", m_lexer.getLineNum(), token.m_lexeme);
+        }
 
+        if ((token = m_lexer.getNextToken()).m_lexeme == "=")
+        {
+          expression();
+          if ((token = m_lexer.getNextToken()).m_lexeme == ";")
+          {
+          }
+          else
+            compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
+        }
+        else
+          compilerError("Expected the SYMBOL '=' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else
+        compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'let' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::ifStatement()
   {
-
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "if")
+    {
+      if ((token = m_lexer.getNextToken()).m_lexeme == "(")
+      {
+        expression();
+        if ((token = m_lexer.getNextToken()).m_lexeme == ")")
+        {
+          body();
+          Token nextToken = m_lexer.peekNextToken();
+          if (nextToken.m_lexeme == "else")
+          {
+            m_lexer.getNextToken();
+            body();
+          }
+        }
+        else
+          compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else
+        compilerError("Expected the SYMBOL '(' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'if' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::whileStatement()
   {
-
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "while")
+    {
+      if ((token = m_lexer.getNextToken()).m_lexeme == "(")
+      {
+        expression();
+        if ((token = m_lexer.getNextToken()).m_lexeme == ")")
+          body();
+        else
+          compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else
+        compilerError("Expected the SYMBOL '(' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'if' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::doStatement()
   {
-
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "do")
+    {
+      subroutineCall();
+      if ((token = m_lexer.getNextToken()).m_lexeme == ";")
+      {
+      }
+      else
+        compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'do' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::returnStatement()
   {
+    Token token = m_lexer.getNextToken();
+    if (token.m_lexeme == "return")
+    {
+      Token nextToken = m_lexer.peekNextToken();
+      if (isExpression(nextToken))
+        expression();
+      
+      if ((token = m_lexer.getNextToken()).m_lexeme == ";")
+      {
+      }
+      else
+        compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected the KEYWORD 'return' at this position", m_lexer.getLineNum(), token.m_lexeme);
+  }
 
+  void Parser::expression()
+  {
+    m_lexer.getNextToken();
+  }
+
+  void Parser::subroutineCall()
+  {
+    Token token = m_lexer.getNextToken();
+    if (token.m_tokenType == Token::TokenType::IDENTIFIER)
+    {
+      Token nextToken = m_lexer.peekNextToken();
+      if (nextToken.m_lexeme == ".")
+      {
+        m_lexer.getNextToken();
+        if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
+        {
+        }
+        else
+          compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+
+      if ((token = m_lexer.getNextToken()).m_lexeme == "(")
+      {
+        expressionList();
+        if ((token = m_lexer.getNextToken()).m_lexeme == ")")
+        {
+        }
+        else
+          compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else
+        compilerError("Expected the SYMBOL '(' at this position", m_lexer.getLineNum(), token.m_lexeme);
+    }
+    else
+      compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
+  }
+
+  void Parser::expressionList()
+  {
+    m_lexer.getNextToken();
+  }
+
+  bool Parser::isExpression(const Token& token)
+  {
+    if (std::find(m_possibleStartTokensOfExpression.begin(), m_possibleStartTokensOfExpression.end(), token.m_lexeme) != m_possibleStartTokensOfExpression.end())
+      return true;
+    else if (token.m_tokenType == Token::TokenType::INTEGERCONSTANT || token.m_tokenType == Token::TokenType::IDENTIFIER || token.m_tokenType == Token::TokenType::STRINGCONSTANT)
+      return true;
+    else
+     return false;
   }
 }

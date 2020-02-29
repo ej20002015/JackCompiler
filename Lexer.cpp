@@ -47,7 +47,7 @@ namespace JackCompiler
 		else if (checkSymbol(token))
 			;
 		else
-			compilerError("Invalid token beginning with " + std::string(1, m_fileStream.peek()));
+			compilerError("Invalid token beginning with '" + std::string(1, m_fileStream.peek()) + "'");
 		
 		if (currentLineNum != -1)
 			m_lineNum = currentLineNum;
