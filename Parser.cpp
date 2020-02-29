@@ -98,7 +98,7 @@ namespace JackCompiler
     if (token.m_lexeme == "constructor" || token.m_lexeme == "function" || token.m_lexeme == "method")
     {
       Token nextToken = m_lexer.peekNextToken();
-      if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || token.m_tokenType == Token::TokenType::IDENTIFIER)
+      if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
         type();
       else if ((token = m_lexer.getNextToken()).m_lexeme == "void")
       {
@@ -474,28 +474,30 @@ namespace JackCompiler
         }
         else
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
-        
-        nextToken = m_lexer.peekNextToken();
-        if (nextToken.m_lexeme == "[")
+      }
+
+      nextToken = m_lexer.peekNextToken(); 
+      if (nextToken.m_lexeme == "[")
+      {
+        m_lexer.getNextToken();
+        expression();
+        Token token = m_lexer.getNextToken();
+        if (token.m_lexeme == "]")
         {
-          m_lexer.getNextToken();
-          expression();
-          if ((token = m_lexer.getNextToken()).m_lexeme == "]")
-          {
-          }
-          else
-            compilerError("Expected the SYMBOL ']' at this position", m_lexer.getLineNum(), token.m_lexeme);
         }
-        else if (nextToken.m_lexeme == "(")
+        else
+          compilerError("Expected the SYMBOL ']' at this position", m_lexer.getLineNum(), token.m_lexeme);
+      }
+      else if (nextToken.m_lexeme == "(")
+      {
+        m_lexer.getNextToken();
+        expressionList();
+        Token token = m_lexer.getNextToken();
+        if (token.m_lexeme == ")")
         {
-          m_lexer.getNextToken();
-          expressionList();
-          if ((token = m_lexer.getNextToken()).m_lexeme == ")")
-          {
-          }
-          else
-            compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
         }
+        else
+          compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
     }
     else if (nextToken.m_lexeme == "(")
