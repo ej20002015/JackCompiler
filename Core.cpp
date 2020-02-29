@@ -21,13 +21,13 @@ namespace JackCompiler
 	}
 
   Token::Token() : m_tokenType(TokenType::NONE), m_lexeme("")
-		{
-			m_tokenTypeMapping[TokenType::NONE]            = "NONE";
-			m_tokenTypeMapping[TokenType::EOFILE]          = "EOF";
-			m_tokenTypeMapping[TokenType::SYMBOL]          = "SYMBOL";
-			m_tokenTypeMapping[TokenType::KEYWORD]         = "KEYWORD";
-			m_tokenTypeMapping[TokenType::INTEGERCONSTANT] = "INTEGERCONSTANT";
-			m_tokenTypeMapping[TokenType::STRINGCONSTANT]  = "STRINGCONSTANT";
-			m_tokenTypeMapping[TokenType::IDENTIFIER]      = "IDENTIFIER";
-		};
+  {
+    m_tokenTypeMapping[TokenType::NONE]            = "NONE";
+    m_tokenTypeMapping[TokenType::EOFILE]          = "EOF";
+    m_tokenTypeMapping[TokenType::SYMBOL]          = "SYMBOL";
+    m_tokenTypeMapping[TokenType::KEYWORD]         = "KEYWORD";
+    m_tokenTypeMapping[TokenType::INTEGERCONSTANT] = "INTEGERCONSTANT";
+    m_tokenTypeMapping[TokenType::STRINGCONSTANT]  = "STRINGCONSTANT";
+    m_tokenTypeMapping[TokenType::IDENTIFIER]      = "IDENTIFIER";
+  };
 }
