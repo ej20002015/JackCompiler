@@ -8,6 +8,39 @@ namespace JackCompiler
     jackProgram();
   }
 
+  bool Parser::checkSymbolExistsInAllSymbolTables(const std::string& name)
+  {
+    for (SymbolTable symbolTable : m_symbolTables)
+    {
+      if (symbolTable.checkSymbolExists(name))
+        return true;
+    }
+
+    return false;
+  }
+
+  bool Parser::checkClassDefined(const std::string& className)
+  {
+    for (SymbolTable symbolTable : m_symbolTables)
+    {
+      if (symbolTable.getTableName() == className)
+        return true;
+    }
+
+    return false;
+  }
+
+  void Parser::resolveSymbol(const std::string& name)
+  {
+    for (std::list<SymbolToBeResolved>::iterator iterator = m_symbolsToBeResolved.begin(); iterator != m_symbolsToBeResolved.end(); ++iterator)
+    {
+      if (iterator->m_name == name)
+      {
+        m_symbolsToBeResolved.erase(iterator);
+      }
+    }
+  }
+
   void Parser::jackProgram()
   {
     classDefinition();
@@ -17,6 +50,8 @@ namespace JackCompiler
     }
     else
       compilerError("Expected the EOF token at this position", m_lexer.getLineNum(), token.m_lexeme);
+    
+    //TODO: resolve any symbols to do with this class
   }
 
   void Parser::classDefinition()
@@ -26,6 +61,7 @@ namespace JackCompiler
     {
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
+        m_symbolTables.push_back(SymbolTable(token.m_lexeme));
         if ((token = m_lexer.getNextToken()).m_lexeme == "{")
         {
           Token nextToken = m_lexer.peekNextToken();
@@ -66,14 +102,42 @@ namespace JackCompiler
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "static" || token.m_lexeme == "field")
     {
+      Symbol::SymbolKind newSymbolKind;
+      if (token.m_lexeme == "static")
+        newSymbolKind = Symbol::SymbolKind::STATIC;
+      else
+        newSymbolKind = Symbol::SymbolKind::FIELD;
+      
+      //peak next token and assume it is a correct type - if it is not the compiler will error appropriately in type()
+      std::string typeString = m_lexer.peekNextToken().m_lexeme;
+      Symbol::SymbolType newSymbolType;
+      if (typeString == "int")
+        newSymbolType = Symbol::SymbolType::INT;
+      else if (typeString == "char")
+        newSymbolType = Symbol::SymbolType::CHAR;
+      else if (typeString == "boolean")
+        newSymbolType = Symbol::SymbolType::BOOLEAN;
+      else
+      {
+        newSymbolType = Symbol::SymbolType::CLASS;
+        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
+        if (!checkClassDefined(typeString))
+          m_symbolsToBeResolved.push_back({typeString, m_lexer.getLineNum()});
+      }
+        
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
-        Token token;
+        //TODO: check symbol is not already declared
+        //create new symbol
+        m_symbolTables.back().addSymbol(token.m_lexeme, newSymbolKind, newSymbolType);
+
         while ((token = m_lexer.getNextToken()).m_lexeme == ",")
         {
           if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
           {
+            //TODO: check symbol not already declared
+            m_symbolTables.back().addSymbol(token.m_lexeme, newSymbolKind, newSymbolType);
           }
           else
             compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);    
@@ -88,8 +152,7 @@ namespace JackCompiler
         compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
     }
     else
-      compilerError("Expected the KEYWORD 'static' or the KEYWORD 'field' at this position", m_lexer.getLineNum(), token.m_lexeme); 
-    
+      compilerError("Expected the KEYWORD 'static' or the KEYWORD 'field' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
   void Parser::subroutineDefinition()

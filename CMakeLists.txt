@@ -12,6 +12,7 @@ add_executable(JackCompiler
     Lexer.cpp
     Core.cpp
     Parser.cpp
+    SymbolTable.cpp
 )
 
 set_property(TARGET JackCompiler PROPERTY CXX_STANDARD 11)
