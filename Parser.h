@@ -11,15 +11,14 @@ namespace JackCompiler
   class Parser
   {
   public:
-    Parser(const std::string& filePath, std::list<SymbolTable>& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved) {}
+    Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved) {}
     void parse();
 
   private:
     Lexer m_lexer;
-    std::list<SymbolTable> m_symbolTables;
-    std::list<SymbolToBeResolved> m_symbolsToBeResolved;
-    bool checkSymbolExistsInAllSymbolTables(const std::string& name);
-    bool checkClassDefined(const std::string& className);
+    SymbolTables& m_symbolTables;
+    std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
+    std::string m_className;
     void resolveSymbol(const std::string& name);
 
     void jackProgram();

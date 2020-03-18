@@ -8,28 +8,6 @@ namespace JackCompiler
     jackProgram();
   }
 
-  bool Parser::checkSymbolExistsInAllSymbolTables(const std::string& name)
-  {
-    for (SymbolTable symbolTable : m_symbolTables)
-    {
-      if (symbolTable.checkSymbolExists(name))
-        return true;
-    }
-
-    return false;
-  }
-
-  bool Parser::checkClassDefined(const std::string& className)
-  {
-    for (SymbolTable symbolTable : m_symbolTables)
-    {
-      if (symbolTable.getTableName() == className)
-        return true;
-    }
-
-    return false;
-  }
-
   void Parser::resolveSymbol(const std::string& name)
   {
     for (std::list<SymbolToBeResolved>::iterator iterator = m_symbolsToBeResolved.begin(); iterator != m_symbolsToBeResolved.end(); ++iterator)
@@ -43,6 +21,10 @@ namespace JackCompiler
 
   void Parser::jackProgram()
   {
+    //if file is empty
+    if (m_lexer.peekNextToken().m_tokenType == Token::TokenType::EOFILE)
+      return;
+
     classDefinition();
     Token token = m_lexer.getNextToken();
     if (token.m_tokenType == Token::TokenType::EOFILE)
@@ -50,8 +32,7 @@ namespace JackCompiler
     }
     else
       compilerError("Expected the EOF token at this position", m_lexer.getLineNum(), token.m_lexeme);
-    
-    //TODO: resolve any symbols to do with this class
+  
   }
 
   void Parser::classDefinition()
@@ -61,7 +42,13 @@ namespace JackCompiler
     {
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
-        m_symbolTables.push_back(SymbolTable(token.m_lexeme));
+        //check a class has not already been declared with the same name
+        if (m_symbolTables.checkClassDefined(token.m_lexeme))
+          compilerError("class with the IDENTIFIER has already been defined", m_lexer.getLineNum(), token.m_lexeme);
+
+        m_symbolTables.addSymbolTable(SymbolTable(token.m_lexeme));
+
+        m_className = token.m_lexeme;
         if ((token = m_lexer.getNextToken()).m_lexeme == "{")
         {
           Token nextToken = m_lexer.peekNextToken();
@@ -72,6 +59,7 @@ namespace JackCompiler
           }
           if ((token = m_lexer.getNextToken()).m_lexeme == "}")
           {
+            //TODO: Check class symbol table and resolve any symbols
           }
           else
             compilerError("Expected the SYMBOL '}' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -121,26 +109,28 @@ namespace JackCompiler
       {
         newSymbolType = Symbol::SymbolType::CLASS;
         //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-        if (!checkClassDefined(typeString))
+        if (!m_symbolTables.checkClassDefined(typeString))
           m_symbolsToBeResolved.push_back({typeString, m_lexer.getLineNum()});
       }
         
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
-        //TODO: check symbol is not already declared
+        if (m_symbolTables.checkSymbolExistsInAllSymbolTables(token.m_lexeme, newSymbolKind))
+          compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
         //create new symbol
-        m_symbolTables.back().addSymbol(token.m_lexeme, newSymbolKind, newSymbolType);
+        m_symbolTables.addToSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind, newSymbolType);
 
         while ((token = m_lexer.getNextToken()).m_lexeme == ",")
         {
           if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
           {
-            //TODO: check symbol not already declared
-            m_symbolTables.back().addSymbol(token.m_lexeme, newSymbolKind, newSymbolType);
+            if (m_symbolTables.checkSymbolExistsInAllSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind))
+              compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
+            m_symbolTables.addToSymbolTables(token.m_lexeme, newSymbolKind, newSymbolType);
           }
           else
-            compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);    
+            compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
         }
         if (token.m_lexeme == ";")
         {
@@ -160,6 +150,7 @@ namespace JackCompiler
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "constructor" || token.m_lexeme == "function" || token.m_lexeme == "method")
     {
+      //TODO: resolve local and class symbols
       Token nextToken = m_lexer.peekNextToken();
       if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
         type();
