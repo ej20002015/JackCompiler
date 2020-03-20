@@ -8,15 +8,29 @@ namespace JackCompiler
     jackProgram();
   }
 
-  void Parser::resolveSymbol(const std::string& name)
+  void Parser::resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind)
   {
     for (std::list<SymbolToBeResolved>::iterator iterator = m_symbolsToBeResolved.begin(); iterator != m_symbolsToBeResolved.end(); ++iterator)
     {
-      if (iterator->m_name == name)
+      if (iterator->m_name == name && iterator->m_kind == symbolKind)
       {
         m_symbolsToBeResolved.erase(iterator);
       }
     }
+  }
+
+  bool Parser::isClassType(const std::string& symbolType)
+  {
+    return std::find(m_primitiveDataType.begin(), m_primitiveDataType.end(), symbolType) == m_primitiveDataType.end();
+  }
+
+  bool Parser::checkSymbolRedeclaration(const std::string& name, const Symbol::SymbolKind& symbolKind) const
+  {
+    //if symbol is a local variable or argument then it will only conflict with variables in the local scope so only check the upmost table
+    if (symbolKind == Symbol::SymbolKind::ARGUMENT || symbolKind == Symbol::SymbolKind::VAR)
+      return m_symbolTables.checkSymbolExistsInCurrentSymbolTable(name, symbolKind);
+    else
+      return m_symbolTables.checkSymbolExistsInAllSymbolTables(name, symbolKind);
   }
 
   void Parser::jackProgram()
@@ -97,26 +111,18 @@ namespace JackCompiler
         newSymbolKind = Symbol::SymbolKind::FIELD;
       
       //peak next token and assume it is a correct type - if it is not the compiler will error appropriately in type()
-      std::string typeString = m_lexer.peekNextToken().m_lexeme;
-      Symbol::SymbolType newSymbolType;
-      if (typeString == "int")
-        newSymbolType = Symbol::SymbolType::INT;
-      else if (typeString == "char")
-        newSymbolType = Symbol::SymbolType::CHAR;
-      else if (typeString == "boolean")
-        newSymbolType = Symbol::SymbolType::BOOLEAN;
-      else
+      std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
+      if (isClassType(newSymbolType))
       {
-        newSymbolType = Symbol::SymbolType::CLASS;
         //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-        if (!m_symbolTables.checkClassDefined(typeString))
-          m_symbolsToBeResolved.push_back({typeString, m_lexer.getLineNum()});
+        if (!m_symbolTables.checkClassDefined(newSymbolType))
+          m_symbolsToBeResolved.push_back({newSymbolType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
       }
         
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
-        if (m_symbolTables.checkSymbolExistsInAllSymbolTables(token.m_lexeme, newSymbolKind))
+        if (checkSymbolRedeclaration(token.m_lexeme, newSymbolKind))
           compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
         //create new symbol
         m_symbolTables.addToSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind, newSymbolType);
@@ -125,9 +131,9 @@ namespace JackCompiler
         {
           if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
           {
-            if (m_symbolTables.checkSymbolExistsInAllSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind))
+            if (checkSymbolRedeclaration(m_className + "." + token.m_lexeme, newSymbolKind))
               compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
-            m_symbolTables.addToSymbolTables(token.m_lexeme, newSymbolKind, newSymbolType);
+            m_symbolTables.addToSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind, newSymbolType);
           }
           else
             compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -150,8 +156,23 @@ namespace JackCompiler
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "constructor" || token.m_lexeme == "function" || token.m_lexeme == "method")
     {
-      //TODO: resolve local and class symbols
+      Symbol::SymbolKind newSymbolKind;
+      if (token.m_lexeme == "constructor")
+        newSymbolKind = Symbol::SymbolKind::CONSTRUCTOR;
+      else if (token.m_lexeme == "function")
+        newSymbolKind = Symbol::SymbolKind::FUNCTION;
+      else
+        newSymbolKind = Symbol::SymbolKind::METHOD;
+
       Token nextToken = m_lexer.peekNextToken();
+      std::string newSymbolType = nextToken.m_lexeme;
+      if (isClassType(newSymbolType))
+      {
+        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
+        if (!m_symbolTables.checkClassDefined(newSymbolType))
+          m_symbolsToBeResolved.push_back({newSymbolType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
+      }
+
       if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
         type();
       else if ((token = m_lexer.getNextToken()).m_lexeme == "void")
@@ -162,11 +183,16 @@ namespace JackCompiler
       
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
+        std::string newSymbolName = m_className + "." + token.m_lexeme;
         if ((token = m_lexer.getNextToken()).m_lexeme == "(")
         {
-          parameterList();
+          std::vector<std::string> newSymbolParameterList = parameterList();
           if ((token = m_lexer.getNextToken()).m_lexeme == ")")
+          {
+            //TODO: go through body statements
             body();
+            m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterList);
+          }
           else
             compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);  
         }
@@ -190,11 +216,23 @@ namespace JackCompiler
       compilerError("Expected the KEYWORD 'int', the KEYWORD 'char', the KEYWORD 'boolean' or an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
-  void Parser::parameterList()
+  const std::vector<std::string> Parser::parameterList()
   {
+    //list of data types in the parameter list. returned to the calling function to create a new FunctionSymbol
+    std::vector<std::string> parameterListTypes;
     Token nextToken = m_lexer.peekNextToken();
+
     if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
+      std::string parameterType = nextToken.m_lexeme;
+      if (isClassType(parameterType))
+      {
+        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
+        if (!m_symbolTables.checkClassDefined(parameterType))
+          m_symbolsToBeResolved.push_back({parameterType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
+      }
+      parameterListTypes.push_back(parameterType);
+
       type();
       Token token = m_lexer.getNextToken();
       if (token.m_tokenType == Token::TokenType::IDENTIFIER)
@@ -205,6 +243,17 @@ namespace JackCompiler
       while ((nextToken = m_lexer.peekNextToken()).m_lexeme == ",")
       {
         m_lexer.getNextToken();
+
+        nextToken = m_lexer.peekNextToken();
+        std::string parameterType = nextToken.m_lexeme;
+        if (isClassType(parameterType))
+        {
+          //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
+          if (!m_symbolTables.checkClassDefined(parameterType))
+            m_symbolsToBeResolved.push_back({parameterType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
+        }
+        parameterListTypes.push_back(parameterType);
+
         type();
         if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
         {
@@ -213,6 +262,8 @@ namespace JackCompiler
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
     }
+
+    return parameterListTypes;
   }
 
   void Parser::body()

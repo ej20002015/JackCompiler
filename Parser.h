@@ -19,7 +19,9 @@ namespace JackCompiler
     SymbolTables& m_symbolTables;
     std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
     std::string m_className;
-    void resolveSymbol(const std::string& name);
+    void resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind);
+    bool isClassType(const std::string& symbolType);
+    bool checkSymbolRedeclaration(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
 
     void jackProgram();
     void classDefinition();
@@ -27,7 +29,7 @@ namespace JackCompiler
     void classVariableDefinition();
     void subroutineDefinition();
     void type();
-    void parameterList();
+    const std::vector<std::string> parameterList();
     void body();
     void statement();
     void variableDeclarationStatement();
@@ -55,6 +57,14 @@ namespace JackCompiler
       "false",
       "null",
       "this"
+    };
+
+    const std::vector<std::string> m_primitiveDataType
+    {
+      "int",
+      "char",
+      "boolean",
+      "void"
     };
   };
 }

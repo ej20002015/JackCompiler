@@ -4,27 +4,21 @@
 
 namespace JackCompiler
 {
-  void Symbol::setUpMaps()
+  std::map<Symbol::SymbolKind, std::string> Symbol::m_symbolKindMapping =
   {
-    m_symbolKindMapping[SymbolKind::ARGUMENT]      = "ARGUMENT";
-    m_symbolKindMapping[SymbolKind::CONSTRUCTOR]   = "CONSTRUCTOR";
-    m_symbolKindMapping[SymbolKind::FIELD]         = "FIELD";
-    m_symbolKindMapping[SymbolKind::FUNCTION]      = "FUNCTION";
-    m_symbolKindMapping[SymbolKind::METHOD]        = "METHOD";
-    m_symbolKindMapping[SymbolKind::STATIC]        = "STATIC";
-    m_symbolKindMapping[SymbolKind::VAR]           = "VAR";
-
-    m_symbolTypeMapping[SymbolType::BOOLEAN]       = "BOOLEAN";
-    m_symbolTypeMapping[SymbolType::CHAR]          = "CHAR";
-    m_symbolTypeMapping[SymbolType::CLASS]         = "CLASS";
-    m_symbolTypeMapping[SymbolType::INT]           = "INT";
-    m_symbolTypeMapping[SymbolType::VOID]          = "VOID";
-    m_symbolTypeMapping[SymbolType::NONE]          = "NONE";
-  }
+    {Symbol::SymbolKind::ARGUMENT, "ARGUMENT"},
+    {Symbol::SymbolKind::CONSTRUCTOR, "CONSTRUCTOR"},
+    {Symbol::SymbolKind::FIELD, "FIELD"},
+    {Symbol::SymbolKind::FUNCTION, "FUNCTION"},
+    {Symbol::SymbolKind::METHOD, "METHOD"},
+    {Symbol::SymbolKind::STATIC, "STATIC"},
+    {Symbol::SymbolKind::VAR, "VAR"},
+    {Symbol::SymbolKind::CLASS, "CLASS"}
+  };
 
   unsigned SymbolTable::m_offsetStatic = 0;
 
-  void SymbolTable::addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType)
+  void SymbolTable::addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType)
   {
     Symbol newSymbol;
     newSymbol.m_kind = symbolKind;
@@ -54,17 +48,17 @@ namespace JackCompiler
       break;
     }
 
-    m_symbols.push_back(Symbol(newSymbol));
+    m_symbols.push_back(std::make_shared<Symbol>(Symbol(newSymbol)));
   }
 
-  void SymbolTable::addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType, const std::vector<Symbol::SymbolType> parameterList)
+  void SymbolTable::addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string>& parameterList)
   {
-    Symbol newSymbol(parameterList);
+    SubroutineSymbol newSymbol(parameterList);
     newSymbol.m_kind = symbolKind;
     newSymbol.m_type = symbolType;
     newSymbol.m_name = symbolName;
     newSymbol.m_offset = -1; //offset set to -1 as this symbol is a function not a variable
-    m_symbols.push_back(Symbol(newSymbol));
+    m_symbols.push_back(std::make_shared<SubroutineSymbol>(SubroutineSymbol(newSymbol)));
   }
 
   bool SymbolTable::checkSymbolExists(const std::string& name, const Symbol::SymbolKind& symbolKind) const
@@ -72,9 +66,10 @@ namespace JackCompiler
     //compare to arguments and local variables if symbol is an argument or local variable
     if (symbolKind == Symbol::SymbolKind::ARGUMENT || symbolKind == Symbol::SymbolKind::VAR)
     {
-      for (Symbol symbol : m_symbols)
+      for (auto symbol : m_symbols)
       {
-        if (symbol.m_name == name && (symbol.m_kind == Symbol::SymbolKind::ARGUMENT || symbol.m_kind == Symbol::SymbolKind::VAR))
+        //std::cout << m_symbols.back()->m_symbolTypeMapping.at(symbol->getParameterList()->at(0)) << std::endl;
+        if (symbol->m_name == name && (symbol->m_kind == Symbol::SymbolKind::ARGUMENT || symbol->m_kind == Symbol::SymbolKind::VAR))
           return true;
       }
       return false;
@@ -83,18 +78,18 @@ namespace JackCompiler
     //compare to fields and static variables if symbol is a field or static variable
     if (symbolKind == Symbol::SymbolKind::FIELD || symbolKind == Symbol::SymbolKind::STATIC)
     {
-      for (Symbol symbol : m_symbols)
+      for (auto symbol : m_symbols)
       {
-        if (symbol.m_name == name && (symbol.m_kind == Symbol::SymbolKind::FIELD || symbol.m_kind == Symbol::SymbolKind::STATIC))
+        if (symbol->m_name == name && (symbol->m_kind == Symbol::SymbolKind::FIELD || symbol->m_kind == Symbol::SymbolKind::STATIC))
           return true;
       }
       return false;
     }
 
     //compare to functions, methods and constructors
-    for (Symbol symbol : m_symbols)
+    for (auto symbol : m_symbols)
       {
-        if (symbol.m_name == name && (symbol.m_kind == Symbol::SymbolKind::FUNCTION || symbol.m_kind == Symbol::SymbolKind::METHOD || symbol.m_kind == Symbol::SymbolKind::CONSTRUCTOR))
+        if (symbol->m_name == name && (symbol->m_kind == Symbol::SymbolKind::FUNCTION || symbol->m_kind == Symbol::SymbolKind::METHOD || symbol->m_kind == Symbol::SymbolKind::CONSTRUCTOR))
           return true;
       }
       return false;
@@ -102,34 +97,40 @@ namespace JackCompiler
 
   void SymbolTable::setSymbolInitialised(const std::string& name)
   {
-    for (Symbol symbol : m_symbols)
+    for (auto symbol : m_symbols)
     {
-      if (symbol.m_name == name)
-        symbol.m_initialised = true;
+      if (symbol->m_name == name)
+        symbol->m_initialised = true;
     }
   }
 
   void SymbolTables::addSymbolTable(const SymbolTable& newSymbolTable)
   {
-    m_symbolTables.push_back(SymbolTable(newSymbolTable));
+    m_symbolTables.push_back(std::make_shared<SymbolTable>(SymbolTable(newSymbolTable)));
   }
 
   bool SymbolTables::checkSymbolExistsInAllSymbolTables(const std::string& name, const Symbol::SymbolKind& symbolKind) const
   {
-    for (SymbolTable symbolTable : m_symbolTables)
+    for (auto symbolTable : m_symbolTables)
     {
-      if (symbolTable.checkSymbolExists(name, symbolKind))
+      if (symbolTable->checkSymbolExists(name, symbolKind))
         return true;
     }
 
     return false;
   }
 
+  bool SymbolTables::checkSymbolExistsInCurrentSymbolTable(const std::string& name, const Symbol::SymbolKind& symbolKind) const
+  {
+    auto currentSymbolTable = m_symbolTables.back();
+    return currentSymbolTable->checkSymbolExists(name, symbolKind);
+  }
+
   bool SymbolTables::checkClassDefined(const std::string& className) const
   {
-    for (SymbolTable symbolTable : m_symbolTables)
+    for (auto symbolTable : m_symbolTables)
     {
-      if (symbolTable.getTableName() == className)
+      if (symbolTable->getTableName() == className)
         return true;
     }
 
@@ -138,19 +139,19 @@ namespace JackCompiler
 
   void SymbolTables::setSymbolInitialised(const std::string& name)
   {
-    for (SymbolTable symbolTable : m_symbolTables)
+    for (auto symbolTable : m_symbolTables)
     {
-      symbolTable.setSymbolInitialised(name);
+      symbolTable->setSymbolInitialised(name);
     }
   }
 
-  void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType)
+  void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType)
   {
-    m_symbolTables.back().addSymbol(symbolName, symbolKind, symbolType);
+    m_symbolTables.back()->addSymbol(symbolName, symbolKind, symbolType);
   }
 
-  void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType, const std::vector<Symbol::SymbolType> parameterList)
+  void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string> parameterList)
   {
-    m_symbolTables.back().addSymbol(symbolName, symbolKind, symbolType, parameterList);
+    m_symbolTables.back()->addSymbol(symbolName, symbolKind, symbolType, parameterList);
   }
 }

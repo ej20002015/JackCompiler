@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <memory>
 
 namespace JackCompiler
 {
@@ -18,43 +19,49 @@ namespace JackCompiler
       FUNCTION,
       METHOD,
       CONSTRUCTOR,
-      ARGUMENT
+      ARGUMENT,
+      CLASS
     };
 
-    std::map<SymbolKind, std::string> m_symbolKindMapping;
+    static std::map<SymbolKind, std::string> m_symbolKindMapping;
 
-    enum class SymbolType
-    {
-      INT,
-      BOOLEAN,
-      CHAR,
-      CLASS,
-      VOID,
-      NONE
-    };
-
-    std::map<SymbolType, std::string> m_symbolTypeMapping;
-
-    Symbol() : m_parameterList(std::vector<SymbolType>({SymbolType::NONE})), m_initialised(false) { setUpMaps(); }
-    Symbol(const std::vector<SymbolType>& parameterList) : m_parameterList(std::vector<SymbolType>(parameterList)), m_initialised(false) { setUpMaps(); }
-    void setUpMaps();
-    bool m_initialised;
-
-    const std::vector<SymbolType> getParameterList() const { return m_parameterList; }
+    Symbol() :  m_initialised(false) {}
+    virtual const std::vector<std::string>* const getParameterList() const { return nullptr; }
 
     SymbolKind m_kind;
-    SymbolType m_type;
+    std::string m_type;
     std::string m_name;
-    unsigned m_offset;
-    std::vector<SymbolType> m_parameterList;
+    int m_offset;
+    bool m_initialised;
   };
 
-  inline std::ostream& operator << (std::ostream& out, Symbol const& symbol) 
+  class SubroutineSymbol : public Symbol
+  {
+  public:
+    SubroutineSymbol(const std::vector<std::string>& parameterList) : Symbol(), m_parameterList(parameterList) {}
+    const std::vector<std::string>* const getParameterList() const override { return &m_parameterList; }
+
+  private:
+    std::vector<std::string> m_parameterList;
+  };
+
+
+  inline std::ostream& operator << (std::ostream& out, const std::shared_ptr<Symbol>& symbol) 
 	{
-		out << "<" << symbol.m_name << ", " << symbol.m_symbolKindMapping.at(symbol.m_kind) << ", " << symbol.m_symbolTypeMapping.at(symbol.m_type) << ", ";
-    for (Symbol::SymbolType symbolType : symbol.getParameterList())
-      out << symbol.m_symbolTypeMapping.at(symbolType);
-    out << ", " << symbol.m_offset << ">";
+		out << "<" << symbol->m_name << ", " << Symbol::m_symbolKindMapping.at(symbol->m_kind) << ", " << symbol->m_type << ", <";
+    if (symbol->getParameterList())
+    {
+      for (unsigned i = 0; i < symbol->getParameterList()->size(); ++i)
+      {
+        out << symbol->getParameterList()->at(i);
+        if (i < symbol->getParameterList()->size() - 1)
+          out << ", ";
+      }
+    }
+    else
+      out << "NO PARAMETER LIST";
+    
+    out << ">, " << symbol->m_offset << ">";
 		return out;
 	}
 
@@ -63,8 +70,8 @@ namespace JackCompiler
   public:
     SymbolTable() : m_tableName("No Name") {}
     SymbolTable(const std::string& tableName) : m_tableName(tableName) {}
-    void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType);
-    void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType, const std::vector<Symbol::SymbolType> parameterList);
+    void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType);
+    void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string>& parameterList);
     bool checkSymbolExists(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
     void setSymbolInitialised(const std::string& name);
     const std::string getTableName() const { return m_tableName; }
@@ -79,19 +86,20 @@ namespace JackCompiler
     };
 
     static unsigned m_offsetStatic;
-    friend std::ostream& operator << (std::ostream& out, SymbolTable const& symbolTable);
+    friend std::ostream& operator << (std::ostream& out, const std::shared_ptr<SymbolTable>& symbolTable);
 
   private:
     unsigned m_offsets[m_numOfDifferentOffsets] = {0};
-    std::list<Symbol> m_symbols;
+    std::list<std::shared_ptr<Symbol>> m_symbols;
     std::string m_tableName;
   };
 
-  inline std::ostream& operator << (std::ostream& out, SymbolTable const& symbolTable)
+  inline std::ostream& operator << (std::ostream& out, const std::shared_ptr<SymbolTable>& symbolTable)
 	{
-		out << symbolTable.getTableName() << std::endl;
-    for (Symbol symbol : symbolTable.m_symbols)
+		out << symbolTable->getTableName() << std::endl;
+    for (auto symbol : symbolTable->m_symbols)
       out << symbol << std::endl;
+
     out << std::endl;
 		return out;
 	}
@@ -101,20 +109,22 @@ namespace JackCompiler
   public:
     void addSymbolTable(const SymbolTable& newSymbolTable);
     bool checkSymbolExistsInAllSymbolTables(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
+    //used to check declarations of local variables against local variables and arguments declared in the same scope
+    bool checkSymbolExistsInCurrentSymbolTable(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
     bool checkClassDefined(const std::string& className) const;
-    void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType);
-    void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const Symbol::SymbolType& symbolType, const std::vector<Symbol::SymbolType> parameterList);
+    void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType);
+    void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string> parameterList);
     void setSymbolInitialised(const std::string& name);
 
-    friend std::ostream& operator << (std::ostream& out, SymbolTables const& symbolTables);
+    friend std::ostream& operator << (std::ostream& out, const SymbolTables& symbolTables);
 
-  //private:
-    std::list<SymbolTable> m_symbolTables;
+  private:
+    std::list<std::shared_ptr<SymbolTable>> m_symbolTables;
   };
 
-  inline std::ostream& operator << (std::ostream& out, SymbolTables const& symbolTables)
+  inline std::ostream& operator << (std::ostream& out, const SymbolTables& symbolTables)
 	{
-    for (SymbolTable symbolTable : symbolTables.m_symbolTables)
+    for (auto symbolTable : symbolTables.m_symbolTables)
       out << symbolTable << std::endl;
 		return out;
 	}
@@ -123,11 +133,12 @@ namespace JackCompiler
   {
     std::string m_name;
     unsigned m_lineNum;
+    Symbol::SymbolKind m_kind;
   };
 
-  inline std::ostream& operator << (std::ostream& out, SymbolToBeResolved const& symbolToBeResolved)
+  inline std::ostream& operator << (std::ostream& out, const SymbolToBeResolved& symbolToBeResolved)
 	{
-    out << "<" << symbolToBeResolved.m_name << ", " << symbolToBeResolved.m_lineNum << std::endl;
+    out << "<" << symbolToBeResolved.m_name << ", " << symbolToBeResolved.m_lineNum << Symbol::m_symbolKindMapping.at(symbolToBeResolved.m_kind) << std::endl;
 		return out;
 	}
 }
