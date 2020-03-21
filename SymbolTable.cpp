@@ -29,6 +29,7 @@ namespace JackCompiler
     {
     case Symbol::SymbolKind::ARGUMENT:
       newSymbol.m_offset = m_offsets[(int)OffsetsIndex::ARGUMENT]++;
+      newSymbol.m_initialised = true;
       break;
     
     case Symbol::SymbolKind::VAR:
@@ -68,7 +69,6 @@ namespace JackCompiler
     {
       for (auto symbol : m_symbols)
       {
-        //std::cout << m_symbols.back()->m_symbolTypeMapping.at(symbol->getParameterList()->at(0)) << std::endl;
         if (symbol->m_name == name && (symbol->m_kind == Symbol::SymbolKind::ARGUMENT || symbol->m_kind == Symbol::SymbolKind::VAR))
           return true;
       }
@@ -100,13 +100,42 @@ namespace JackCompiler
     for (auto symbol : m_symbols)
     {
       if (symbol->m_name == name)
+      {
         symbol->m_initialised = true;
+      }
     }
+  }
+
+  bool SymbolTable::checkSymbolInitialised(const std::string& name) const
+  {
+    for (auto symbol : m_symbols)
+    {
+      if (symbol->m_name == name && symbol->m_initialised)
+        return true;
+    }
+
+    return false;
+  }
+
+  std::pair<bool, std::string> SymbolTable::getSymbolType(const std::string& name) const
+  {
+    for (auto symbol : m_symbols)
+    {
+      if (symbol->m_name == name)
+        return std::pair<bool, std::string>{true, symbol->m_type};
+    }
+
+    return std::pair<bool, std::string>{false, "NO SUCH SYMBOL"};
   }
 
   void SymbolTables::addSymbolTable(const SymbolTable& newSymbolTable)
   {
     m_symbolTables.push_back(std::make_shared<SymbolTable>(SymbolTable(newSymbolTable)));
+  }
+
+  void SymbolTables::removeCurrentSymbolTable()
+  {
+    m_symbolTables.pop_back();
   }
 
   bool SymbolTables::checkSymbolExistsInAllSymbolTables(const std::string& name, const Symbol::SymbolKind& symbolKind) const
@@ -137,14 +166,6 @@ namespace JackCompiler
     return false;
   }
 
-  void SymbolTables::setSymbolInitialised(const std::string& name)
-  {
-    for (auto symbolTable : m_symbolTables)
-    {
-      symbolTable->setSymbolInitialised(name);
-    }
-  }
-
   void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType)
   {
     m_symbolTables.back()->addSymbol(symbolName, symbolKind, symbolType);
@@ -153,5 +174,85 @@ namespace JackCompiler
   void SymbolTables::addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string> parameterList)
   {
     m_symbolTables.back()->addSymbol(symbolName, symbolKind, symbolType, parameterList);
+  }
+
+  void SymbolTables::setSymbolInitialised(const std::string& name)
+  {
+    for (auto symbolTable : m_symbolTables)
+      symbolTable->setSymbolInitialised(name);
+  }
+
+  void SymbolTables::setSymbolInitialised(const std::string& name, const std::string& className)
+  {
+    for (auto symbolTable : m_symbolTables)
+      symbolTable->setSymbolInitialised(name);
+
+    if (!checkSymbolInitialised(name))
+    { 
+      for (auto symbolTable : m_symbolTables)
+        symbolTable->setSymbolInitialised(className + "." + name);
+    }
+
+  }
+
+  bool SymbolTables::checkSymbolInitialised(const std::string& name) const
+  {
+    for (auto symbolTable: m_symbolTables)
+    {
+      if (symbolTable->checkSymbolInitialised(name))
+        return true;
+    }
+
+    return false;
+  }
+
+  bool SymbolTables::checkSymbolInitialised(const std::string& name, const std::string& className) const
+  {
+    for (auto symbolTable: m_symbolTables)
+    {
+      if (symbolTable->checkSymbolInitialised(name))
+        return true;
+    }
+
+    for (auto symbolTable: m_symbolTables)
+    {
+      if (symbolTable->checkSymbolInitialised(className + "." + name))
+        return true;
+    }
+
+    return false;
+  }
+
+  std::pair<bool, std::string> SymbolTables::getSymbolType(const std::string& name) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto symbolTypePair = symbolTable->getSymbolType(name);
+      if (symbolTypePair.first == true)
+        return symbolTypePair;
+    }
+
+    return std::pair<bool, std::string>{false, "NO SUCH SYMBOL"};
+  }
+
+  std::pair<bool, std::string> SymbolTables::getSymbolType(const std::string& name, const std::string& className) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto symbolTypePair = symbolTable->getSymbolType(name);
+      if (symbolTypePair.first == true)
+        return symbolTypePair;
+    }
+
+    //check for field or static variables
+
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto symbolTypePair = symbolTable->getSymbolType(className + "." + name);
+      if (symbolTypePair.first == true)
+        return symbolTypePair;
+    }
+
+    return std::pair<bool, std::string>{false, "NO SUCH SYMBOL"};
   }
 }

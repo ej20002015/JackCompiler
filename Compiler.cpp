@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <dirent.h>
+#include <algorithm>
 
 #include "Core.h"
 #include "Lexer.h"
@@ -15,7 +16,7 @@ namespace JackCompiler
     SymbolTable::m_offsetStatic = 0;
     addLibrarySymbols();
   }
-  
+
   void Compiler::addLibrarySymbols()
   {
     //add Math class subroutines
@@ -112,12 +113,13 @@ namespace JackCompiler
 			compilerError("Directory does not contain any jack files");
 
 		for (std::string filePath : m_filePaths)
+    {
 			compileFile(filePath);
+    }
 
-    std::cout << m_symbolTables << std::endl;
     //if unresolved symbols exist then throw an error
     if (!m_symbolsToBeResolved.empty())
-      compilerError("Symbol has not been resolved", m_symbolsToBeResolved.front().m_lineNum, m_symbolsToBeResolved.front().m_name);
+      compilerError("Symbol has not been resolved : " + m_symbolsToBeResolved.front().m_fileName, m_symbolsToBeResolved.front().m_lineNum, m_symbolsToBeResolved.front().m_name);
 		
 		//No errors occurred during compilation so return 0
 		return 0;

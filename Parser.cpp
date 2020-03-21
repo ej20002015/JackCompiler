@@ -10,16 +10,17 @@ namespace JackCompiler
 
   void Parser::resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind)
   {
+    std::vector<Symbol::SymbolKind> functionKinds {Symbol::SymbolKind::CONSTRUCTOR, Symbol::SymbolKind::FUNCTION, Symbol::SymbolKind::METHOD};
     for (std::list<SymbolToBeResolved>::iterator iterator = m_symbolsToBeResolved.begin(); iterator != m_symbolsToBeResolved.end(); ++iterator)
     {
-      if (iterator->m_name == name && iterator->m_kind == symbolKind)
+      if (iterator->m_name == name && (iterator->m_kind == symbolKind || std::find(functionKinds.begin(), functionKinds.end(), symbolKind) != functionKinds.end()))
       {
         m_symbolsToBeResolved.erase(iterator);
       }
     }
   }
 
-  bool Parser::isClassType(const std::string& symbolType)
+  bool Parser::isClassType(const std::string& symbolType) const
   {
     return std::find(m_primitiveDataType.begin(), m_primitiveDataType.end(), symbolType) == m_primitiveDataType.end();
   }
@@ -31,6 +32,37 @@ namespace JackCompiler
       return m_symbolTables.checkSymbolExistsInCurrentSymbolTable(name, symbolKind);
     else
       return m_symbolTables.checkSymbolExistsInAllSymbolTables(name, symbolKind);
+  }
+  
+  void Parser::resolveSymbols()
+  {
+    //get list of symbols that have been defined in the current class to resolve
+    std::list<std::shared_ptr<Symbol>> symbolsToResolve = m_symbolTables.getSymbolsFromCurrentSymbolTable();
+    for (auto symbol : symbolsToResolve)
+    {
+      resolveSymbol(symbol->m_name, symbol->m_kind);
+    }
+
+    //resolve any class references
+    resolveSymbol(m_className, Symbol::SymbolKind::CLASS);
+  }
+
+  void Parser::determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind) const
+  {
+    if (isClassType(symbolName))
+    {
+      //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
+      if (symbolName.find('.') == std::string::npos)
+      {
+        if (!m_symbolTables.checkClassDefined(symbolName))
+          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind});
+      }
+      else
+      {
+        if (!m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::FUNCTION))
+          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind});
+      }
+    }
   }
 
   void Parser::jackProgram()
@@ -73,7 +105,7 @@ namespace JackCompiler
           }
           if ((token = m_lexer.getNextToken()).m_lexeme == "}")
           {
-            //TODO: Check class symbol table and resolve any symbols
+            resolveSymbols();
           }
           else
             compilerError("Expected the SYMBOL '}' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -112,13 +144,7 @@ namespace JackCompiler
       
       //peak next token and assume it is a correct type - if it is not the compiler will error appropriately in type()
       std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
-      if (isClassType(newSymbolType))
-      {
-        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-        if (!m_symbolTables.checkClassDefined(newSymbolType))
-          m_symbolsToBeResolved.push_back({newSymbolType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
-      }
-        
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
@@ -166,12 +192,7 @@ namespace JackCompiler
 
       Token nextToken = m_lexer.peekNextToken();
       std::string newSymbolType = nextToken.m_lexeme;
-      if (isClassType(newSymbolType))
-      {
-        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-        if (!m_symbolTables.checkClassDefined(newSymbolType))
-          m_symbolsToBeResolved.push_back({newSymbolType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
-      }
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
 
       if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
         type();
@@ -186,12 +207,24 @@ namespace JackCompiler
         std::string newSymbolName = m_className + "." + token.m_lexeme;
         if ((token = m_lexer.getNextToken()).m_lexeme == "(")
         {
-          std::vector<std::string> newSymbolParameterList = parameterList();
+          auto newSymbolParameterListPair = parameterList();
           if ((token = m_lexer.getNextToken()).m_lexeme == ")")
           {
             //TODO: go through body statements
+            //make new symbol table for this subroutine scope
+            m_symbolTables.addSymbolTable(SymbolTable());
+            std::vector<std::string> newSymbolParameterListTypes = newSymbolParameterListPair.first;
+            std::vector<std::string> newSymbolParameterListNames = newSymbolParameterListPair.second;
+            //add arguments to table
+            for (int i = 0; i < newSymbolParameterListTypes.size(); ++i)
+            {
+              m_symbolTables.addToSymbolTables(newSymbolParameterListNames.at(i), Symbol::SymbolKind::ARGUMENT, newSymbolParameterListTypes.at(i));  
+            }
             body();
-            m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterList);
+            //remove symbol table for this subroutine scope
+            //std::cout << m_symbolTables << std::endl;
+            m_symbolTables.removeCurrentSymbolTable();
+            m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterListTypes);
           }
           else
             compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);  
@@ -216,27 +249,25 @@ namespace JackCompiler
       compilerError("Expected the KEYWORD 'int', the KEYWORD 'char', the KEYWORD 'boolean' or an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
-  const std::vector<std::string> Parser::parameterList()
+  const std::pair<std::vector<std::string>, std::vector<std::string>> Parser::parameterList()
   {
     //list of data types in the parameter list. returned to the calling function to create a new FunctionSymbol
     std::vector<std::string> parameterListTypes;
+    std::vector<std::string> parameterListNames;
     Token nextToken = m_lexer.peekNextToken();
 
     if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
       std::string parameterType = nextToken.m_lexeme;
-      if (isClassType(parameterType))
-      {
-        //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-        if (!m_symbolTables.checkClassDefined(parameterType))
-          m_symbolsToBeResolved.push_back({parameterType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
-      }
+      determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS);
+
       parameterListTypes.push_back(parameterType);
 
       type();
       Token token = m_lexer.getNextToken();
       if (token.m_tokenType == Token::TokenType::IDENTIFIER)
       {
+        parameterListNames.push_back(token.m_lexeme);
       }
       else
         compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -246,31 +277,28 @@ namespace JackCompiler
 
         nextToken = m_lexer.peekNextToken();
         std::string parameterType = nextToken.m_lexeme;
-        if (isClassType(parameterType))
-        {
-          //attempt to find this class in a previous symbol table, otherwise add it to the list to be resolved later
-          if (!m_symbolTables.checkClassDefined(parameterType))
-            m_symbolsToBeResolved.push_back({parameterType, m_lexer.getLineNum(), Symbol::SymbolKind::CLASS});
-        }
+        determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS);
+
         parameterListTypes.push_back(parameterType);
 
         type();
         if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
         {
+          parameterListNames.push_back(token.m_lexeme);
         }
         else
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
     }
 
-    return parameterListTypes;
+    return std::pair<std::vector<std::string>, std::vector<std::string>>{parameterListTypes, parameterListNames};
   }
 
   void Parser::body()
   {
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "{")
-    {  
+    {
       Token nextToken = m_lexer.peekNextToken();
       while (nextToken.m_lexeme == "var" || nextToken.m_lexeme == "let" || nextToken.m_lexeme == "if" || nextToken.m_lexeme == "while" || nextToken.m_lexeme == "do" || nextToken.m_lexeme == "return")
       {
@@ -311,13 +339,25 @@ namespace JackCompiler
     Token token = m_lexer.getNextToken();
     if (token.m_lexeme == "var")
     {
+      std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
+        if (checkSymbolRedeclaration(token.m_lexeme, Symbol::SymbolKind::VAR))
+          compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
+        
+        //add token to subroutine scope symbol table
+        m_symbolTables.addToSymbolTables(token.m_lexeme, Symbol::SymbolKind::VAR, newSymbolType);
+
         while ((token = m_lexer.getNextToken()).m_lexeme == ",")
         {
           if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
           {
+            if (checkSymbolRedeclaration(token.m_lexeme, Symbol::SymbolKind::VAR))
+              compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
+
+            m_symbolTables.addToSymbolTables(token.m_lexeme, Symbol::SymbolKind::VAR, newSymbolType);
           }
           else
             compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);    
@@ -337,18 +377,28 @@ namespace JackCompiler
 
   void Parser::letStatement()
   {
+    //TODO: semantic analysis for the let statement
     Token token = m_lexer.getNextToken();
+    std::string leftHandSideType;
     if (token.m_lexeme == "let")
     {
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
+        std::string symbolName = token.m_lexeme;
+        if (!m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::ARGUMENT) && !m_symbolTables.checkSymbolExistsInAllSymbolTables(m_className + "." + symbolName, Symbol::SymbolKind::FIELD))
+          compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
+
         Token nextToken = m_lexer.peekNextToken();
         if (nextToken.m_lexeme == "[")
         {
           m_lexer.getNextToken();
-          expression();
+          std::string expressionType = expression();
+          if (expressionType != "int" && expressionType != "any")
+            compilerError("Expression in brackets does not evaluate as an INT", m_lexer.getLineNum(), "[");
+
           if ((token = m_lexer.getNextToken()).m_lexeme == "]")
           {
+            leftHandSideType = "any";
           }
           else
             compilerError("Expected the SYMBOL ']' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -356,9 +406,17 @@ namespace JackCompiler
 
         if ((token = m_lexer.getNextToken()).m_lexeme == "=")
         {
-          expression();
+          std::string expressionType = expression();
+          auto symbolTypePair = m_symbolTables.getSymbolType(symbolName, m_className);
+          if (leftHandSideType != "any")
+            leftHandSideType = symbolTypePair.second;
+          if (symbolTypePair.first != true || (leftHandSideType != expressionType && (!(leftHandSideType == "char" && expressionType == "int") && !(leftHandSideType == "int" && expressionType == "char")) && expressionType != "any") && leftHandSideType != "any")
+            compilerError("Expression on the right hand side of the assignment does not match the data type of the variable", m_lexer.getLineNum(), symbolName);
+
           if ((token = m_lexer.getNextToken()).m_lexeme == ";")
           {
+            //declare the symbol as being initialised with a value
+            m_symbolTables.setSymbolInitialised(symbolName, m_className);
           }
           else
             compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -456,16 +514,20 @@ namespace JackCompiler
       compilerError("Expected the KEYWORD 'return' at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
-  void Parser::expression()
+  std::string Parser::expression()
   {
-    relationalExpression();
+    std::string expressionType;
+    expressionType = relationalExpression();
     Token nextToken = m_lexer.peekNextToken();
     while (nextToken.m_lexeme == "&" || nextToken.m_lexeme == "|")
     {
+      expressionType = "boolean";
       m_lexer.getNextToken();
       relationalExpression();
       nextToken = m_lexer.peekNextToken();
     }
+
+    return expressionType;
   }
 
   void Parser::subroutineCall()
@@ -514,61 +576,87 @@ namespace JackCompiler
     }
   }
 
-  void Parser::relationalExpression()
+  std::string Parser::relationalExpression()
   {
-    arithmeticExpression();
+    std::string relationalExpressionType;
+    relationalExpressionType = arithmeticExpression();
     Token nextToken = m_lexer.peekNextToken();
     while (nextToken.m_lexeme == "=" || nextToken.m_lexeme == ">" || nextToken.m_lexeme == "<")
     {
+      relationalExpressionType = "boolean";
       m_lexer.getNextToken();
       arithmeticExpression();
       nextToken = m_lexer.peekNextToken();
     }
+
+    return relationalExpressionType;
   }
 
-  void Parser::arithmeticExpression()
+  std::string Parser::arithmeticExpression()
   {
-    term();
+    std::string arithmeticExpressionType;
+    arithmeticExpressionType = term();
     Token nextToken = m_lexer.peekNextToken();
     while (nextToken.m_lexeme == "+" || nextToken.m_lexeme == "-")
     {
+      arithmeticExpressionType = "int";
       m_lexer.getNextToken();
       term();
       nextToken = m_lexer.peekNextToken();
     }
+
+    return arithmeticExpressionType;
   }
 
-  void Parser::term()
+  std::string Parser::term()
   {
-    factor();
+    std::string termType;
+    termType = factor();
     Token nextToken = m_lexer.peekNextToken();
     while (nextToken.m_lexeme == "*" || nextToken.m_lexeme == "/")
     {
+      termType = "int";
       m_lexer.getNextToken();
       factor();
       nextToken = m_lexer.peekNextToken();
     }
+
+    return termType;
   }
 
-  void Parser::factor()
+  std::string Parser::factor()
   {
+    std::string factorType;
     Token nextToken = m_lexer.peekNextToken();
     if (nextToken.m_lexeme == "-" || nextToken.m_lexeme == "~")
     {
       m_lexer.getNextToken();
     }
-    operand();
+    factorType = operand();
+
+    return factorType;
   }
 
-  void Parser::operand()
+  std::string Parser::operand()
   {
+    std::string operandType;
     Token nextToken = m_lexer.peekNextToken();
     if (nextToken.m_tokenType == Token::TokenType::INTEGERCONSTANT)
     {
+      operandType = "int";
       m_lexer.getNextToken();
     }
     else if (nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
+      std::string symbolName = nextToken.m_lexeme;
+      std::string prefixSymbolName = nextToken.m_lexeme;
+      auto operandTypePair = m_symbolTables.getSymbolType(symbolName, m_className);
+      bool found = operandTypePair.first;
+      if (!found && !isClassType(operandTypePair.second))
+        compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
+
+      operandType = operandTypePair.second;
+
       m_lexer.getNextToken();
       if ((nextToken = m_lexer.peekNextToken()).m_lexeme == ".")
       {
@@ -576,16 +664,45 @@ namespace JackCompiler
         Token token = m_lexer.getNextToken();
         if (token.m_tokenType == Token::TokenType::IDENTIFIER)
         {
+          symbolName = symbolName + "." + token.m_lexeme;
+
+          operandTypePair = m_symbolTables.getSymbolType(prefixSymbolName);
+          found = operandTypePair.first;
+          if (found)
+          {
+            symbolName = operandTypePair.second + "." + token.m_lexeme;
+          }
+
+          determineIfNeedsToBeResolved(symbolName, Symbol::SymbolKind::FUNCTION);
+          
+          auto operandTypePair = m_symbolTables.getSymbolType(symbolName);
+          operandType = operandTypePair.first ? operandTypePair.second : "any";
+
+          if (m_symbolTables.getSymbolType(operandTypePair.second).first && !m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::FUNCTION))
+          {
+            compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), prefixSymbolName + "." + token.m_lexeme);
+          }
         }
         else
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
 
+      if (symbolName.find('.') == std::string::npos && !m_symbolTables.getSymbolType(symbolName, m_className).first)
+        compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
+
+      if (!m_symbolTables.checkSymbolInitialised(symbolName, m_className) && symbolName.find('.') == std::string::npos)
+        compilerError("Symbol has not been initialised", m_lexer.getLineNum(), symbolName);
+
       nextToken = m_lexer.peekNextToken(); 
       if (nextToken.m_lexeme == "[")
       {
         m_lexer.getNextToken();
-        expression();
+        std::string bracketDataType = expression();
+        if (bracketDataType != "int" && bracketDataType != "any")
+          compilerError("Expression in brackets does not evaluate as an INT", m_lexer.getLineNum(), "[");
+        
+        operandType = "any";
+
         Token token = m_lexer.getNextToken();
         if (token.m_lexeme == "]")
         {
@@ -596,6 +713,7 @@ namespace JackCompiler
       else if (nextToken.m_lexeme == "(")
       {
         m_lexer.getNextToken();
+        //TODO: semantic analysis on expression list
         expressionList();
         Token token = m_lexer.getNextToken();
         if (token.m_lexeme == ")")
@@ -608,7 +726,7 @@ namespace JackCompiler
     else if (nextToken.m_lexeme == "(")
     {
       m_lexer.getNextToken();
-      expression();
+      operandType = expression();
       Token token = m_lexer.getNextToken();
       if (token.m_lexeme == ")")
       {
@@ -619,25 +737,32 @@ namespace JackCompiler
     else if (nextToken.m_tokenType == Token::TokenType::STRINGCONSTANT)
     {
       m_lexer.getNextToken();
+      operandType = "String";
     }
     else if (nextToken.m_lexeme == "true")
     {
       m_lexer.getNextToken();
+      operandType = "boolean";
     }
     else if (nextToken.m_lexeme == "false")
     {
       m_lexer.getNextToken();
+      operandType = "boolean";
     }
     else if (nextToken.m_lexeme == "null")
     {
       m_lexer.getNextToken();
+      operandType = "any";
     }
     else if (nextToken.m_lexeme == "this")
     {
       m_lexer.getNextToken();
+      operandType = m_className;
     }
     else
       compilerError("Expected an INTEGERCONSTANT, an IDENTIFIER, the SYMBOL '(', a STRINGCONSTANT, the KEYWORD 'true', the KEYWORD 'false', the KEYWORD 'null' or the KEYWORD 'this' at this position", m_lexer.getLineNum(), nextToken.m_lexeme);
+
+    return operandType;
   }
 
   bool Parser::isExpression(const Token& token)
