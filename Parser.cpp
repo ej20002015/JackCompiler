@@ -258,13 +258,15 @@ namespace JackCompiler
         if ((token = m_lexer.getNextToken()).m_lexeme == "(")
         {
           auto newSymbolParameterListPair = parameterList();
+          std::vector<std::string> newSymbolParameterListTypes = newSymbolParameterListPair.first;
+          std::vector<std::string> newSymbolParameterListNames = newSymbolParameterListPair.second;
           if ((token = m_lexer.getNextToken()).m_lexeme == ")")
           {
             //TODO: go through body statements
             //make new symbol table for this subroutine scope
+            m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterListTypes);
+            m_scopeReturnType = newSymbolType;
             m_symbolTables.addSymbolTable(SymbolTable());
-            std::vector<std::string> newSymbolParameterListTypes = newSymbolParameterListPair.first;
-            std::vector<std::string> newSymbolParameterListNames = newSymbolParameterListPair.second;
             //add arguments to table
             for (int i = 0; i < newSymbolParameterListTypes.size(); ++i)
             {
@@ -272,9 +274,7 @@ namespace JackCompiler
             }
             body();
             //remove symbol table for this subroutine scope
-            //std::cout << m_symbolTables << std::endl;
             m_symbolTables.removeCurrentSymbolTable();
-            m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterListTypes);
           }
           else
             compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);  
@@ -551,7 +551,12 @@ namespace JackCompiler
     {
       Token nextToken = m_lexer.peekNextToken();
       if (isExpression(nextToken))
-        expression();
+      {
+        std::string returnedDataType = expression();
+
+        if (returnedDataType != m_scopeReturnType && returnedDataType != "any" && !(returnedDataType == "int" && m_scopeReturnType == "char"))
+          compilerError("Expected return value to be of type " + m_scopeReturnType + " not " + returnedDataType, m_lexer.getLineNum(), nextToken.m_lexeme);
+      }
       
       if ((token = m_lexer.getNextToken()).m_lexeme == ";")
       {
@@ -797,7 +802,6 @@ namespace JackCompiler
         m_lexer.getNextToken();
         auto expressionListDataTypes = expressionList();
 
-        //TODO: Do analysis here aswell
         determineIfNeedsToBeResolved(symbolName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
 
         //Compare the expression list against the parameter list

@@ -20,6 +20,7 @@ namespace JackCompiler
     std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
     std::string m_className;
     std::string m_filePath;
+    std::string m_scopeReturnType;
     void resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind, const std::vector<std::string>* parameterList);
     bool isClassType(const std::string& symbolType) const;
     bool checkSymbolRedeclaration(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
