@@ -557,6 +557,11 @@ namespace JackCompiler
         if (returnedDataType != m_scopeReturnType && returnedDataType != "any" && !(returnedDataType == "int" && m_scopeReturnType == "char"))
           compilerError("Expected return value to be of type " + m_scopeReturnType + " not " + returnedDataType, m_lexer.getLineNum(), nextToken.m_lexeme);
       }
+      else
+      {
+        if (m_scopeReturnType != "void")
+          compilerError("Expected subroutine to return a value of type " + m_scopeReturnType, m_lexer.getLineNum(), nextToken.m_lexeme);
+      }
       
       if ((token = m_lexer.getNextToken()).m_lexeme == ";")
       {
