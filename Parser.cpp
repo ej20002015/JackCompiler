@@ -8,16 +8,41 @@ namespace JackCompiler
     jackProgram();
   }
 
-  void Parser::resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind)
+  void Parser::resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind, const std::vector<std::string>* parameterList)
   {
     std::vector<Symbol::SymbolKind> functionKinds {Symbol::SymbolKind::CONSTRUCTOR, Symbol::SymbolKind::FUNCTION, Symbol::SymbolKind::METHOD};
-    for (std::list<SymbolToBeResolved>::iterator iterator = m_symbolsToBeResolved.begin(); iterator != m_symbolsToBeResolved.end(); ++iterator)
-    {
-      if (iterator->m_name == name && (iterator->m_kind == symbolKind || std::find(functionKinds.begin(), functionKinds.end(), symbolKind) != functionKinds.end()))
-      {
-        m_symbolsToBeResolved.erase(iterator);
-      }
-    }
+
+    //use the erase-remove idiom to go through the list of unresolved symbols and delete any symbols matching the arguments passed in
+    m_symbolsToBeResolved.erase(std::remove_if(m_symbolsToBeResolved.begin(),
+                                              m_symbolsToBeResolved.end(),
+                                              [=](const SymbolToBeResolved& symbolToBeResolved)
+                                              {
+                                                if (symbolToBeResolved.m_name == name && (symbolToBeResolved.m_kind == symbolKind || std::find(functionKinds.begin(), functionKinds.end(), symbolKind) != functionKinds.end()))
+                                                {
+                                                  //check parameter list matches
+                                                  if (parameterList)
+                                                  {
+                                                    if (symbolToBeResolved.m_parameterList.first)
+                                                    {
+                                                      if (parameterList->size() != symbolToBeResolved.m_parameterList.second.size())
+                                                        compilerError("Argument list is not of the correct length : " + symbolToBeResolved.m_fileName, symbolToBeResolved.m_lineNum, "(");
+                                                      else
+                                                      {
+                                                        for (int i = 0; i < parameterList->size(); ++i)
+                                                        {
+                                                          if (parameterList->at(i) != symbolToBeResolved.m_parameterList.second.at(i) && symbolToBeResolved.m_parameterList.second.at(i) != "any" && parameterList->at(i) != "any" && 
+                                                          !(parameterList->at(i) == "int" && symbolToBeResolved.m_parameterList.second.at(i) == "char") && !(parameterList->at(i) == "char" && symbolToBeResolved.m_parameterList.second.at(i) == "int"))
+                                                            compilerError("Argument list does not match the data types of the function parameters : " + symbolToBeResolved.m_fileName, symbolToBeResolved.m_lineNum, "(");
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                  return true; 
+                                                }
+                                                return false;
+                                              }),
+                                m_symbolsToBeResolved.end()
+    );
   }
 
   bool Parser::isClassType(const std::string& symbolType) const
@@ -40,14 +65,14 @@ namespace JackCompiler
     std::list<std::shared_ptr<Symbol>> symbolsToResolve = m_symbolTables.getSymbolsFromCurrentSymbolTable();
     for (auto symbol : symbolsToResolve)
     {
-      resolveSymbol(symbol->m_name, symbol->m_kind);
+      resolveSymbol(symbol->m_name, symbol->m_kind, symbol->getParameterList());
     }
 
     //resolve any class references
-    resolveSymbol(m_className, Symbol::SymbolKind::CLASS);
+    resolveSymbol(m_className, Symbol::SymbolKind::CLASS, nullptr);
   }
 
-  void Parser::determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind) const
+  bool Parser::determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind, std::pair<bool, std::vector<std::string>> parameterList)
   {
     if (isClassType(symbolName))
     {
@@ -55,12 +80,37 @@ namespace JackCompiler
       if (symbolName.find('.') == std::string::npos)
       {
         if (!m_symbolTables.checkClassDefined(symbolName))
-          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind});
+        {
+          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind, parameterList});
+          return true;
+        }
       }
       else
       {
         if (!m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::FUNCTION))
-          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind});
+        {
+          m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind, parameterList});
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  void Parser::compareArgumentListToParameterList(const std::vector<std::string>* parameterList, const std::vector<std::string>& expressionListDataTypes) const
+  {
+    if (parameterList)
+    {
+      if (parameterList->size() != expressionListDataTypes.size())
+        compilerError("Argument list is not of the correct length", m_lexer.getLineNum(), "(");
+      else
+      {
+        for (int i = 0; i < parameterList->size(); ++i)
+        {
+          if (parameterList->at(i) != expressionListDataTypes.at(i) && expressionListDataTypes.at(i) != "any" && parameterList->at(i) != "any" && 
+          !(parameterList->at(i) == "int" && expressionListDataTypes.at(i) == "char") && !(parameterList->at(i) == "char" && expressionListDataTypes.at(i) == "int"))
+            compilerError("Argument list does not match the data types of the function parameters", m_lexer.getLineNum(), "(");
+        }
       }
     }
   }
@@ -144,7 +194,7 @@ namespace JackCompiler
       
       //peak next token and assume it is a correct type - if it is not the compiler will error appropriately in type()
       std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
-      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
@@ -192,7 +242,7 @@ namespace JackCompiler
 
       Token nextToken = m_lexer.peekNextToken();
       std::string newSymbolType = nextToken.m_lexeme;
-      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
 
       if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
         type();
@@ -259,7 +309,7 @@ namespace JackCompiler
     if (nextToken.m_lexeme == "int" || nextToken.m_lexeme == "char" || nextToken.m_lexeme == "boolean" || nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
       std::string parameterType = nextToken.m_lexeme;
-      determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS);
+      determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
 
       parameterListTypes.push_back(parameterType);
 
@@ -277,7 +327,7 @@ namespace JackCompiler
 
         nextToken = m_lexer.peekNextToken();
         std::string parameterType = nextToken.m_lexeme;
-        determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS);
+        determineIfNeedsToBeResolved(parameterType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
 
         parameterListTypes.push_back(parameterType);
 
@@ -340,7 +390,7 @@ namespace JackCompiler
     if (token.m_lexeme == "var")
     {
       std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
-      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS);
+      determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
       {
@@ -377,7 +427,6 @@ namespace JackCompiler
 
   void Parser::letStatement()
   {
-    //TODO: semantic analysis for the let statement
     Token token = m_lexer.getNextToken();
     std::string leftHandSideType;
     if (token.m_lexeme == "let")
@@ -535,20 +584,47 @@ namespace JackCompiler
     Token token = m_lexer.getNextToken();
     if (token.m_tokenType == Token::TokenType::IDENTIFIER)
     {
+      std::string functionName = token.m_lexeme;
+      std::string prefixFunctionName = functionName;
       Token nextToken = m_lexer.peekNextToken();
       if (nextToken.m_lexeme == ".")
       {
         m_lexer.getNextToken();
         if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
         {
+
+          functionName = functionName + "." + token.m_lexeme;
+
+          auto operandTypePair = m_symbolTables.getSymbolType(prefixFunctionName, m_className);
+          bool found = operandTypePair.first;
+          if (found)
+            functionName = operandTypePair.second + "." + token.m_lexeme;
+          
+          operandTypePair = m_symbolTables.getSymbolType(functionName);
+
+          if (m_symbolTables.getSymbolType(operandTypePair.second).first && !m_symbolTables.checkSymbolExistsInAllSymbolTables(functionName, Symbol::SymbolKind::FUNCTION))
+          {
+            compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), prefixFunctionName + "." + token.m_lexeme);
+          }
         }
         else
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
+      else
+      {
+        functionName = m_className + "." + functionName;
+      }
+      
+      const std::vector<std::string>* parameterList = m_symbolTables.getParameterList(functionName);
 
       if ((token = m_lexer.getNextToken()).m_lexeme == "(")
       {
-        expressionList();
+        const std::vector<std::string> expressionListDataTypes = expressionList();
+        determineIfNeedsToBeResolved(functionName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
+
+        //Compare the expression list against the parameter list
+        compareArgumentListToParameterList(parameterList, expressionListDataTypes);
+
         if ((token = m_lexer.getNextToken()).m_lexeme == ")")
         {
         }
@@ -562,18 +638,21 @@ namespace JackCompiler
       compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
   }
 
-  void Parser::expressionList()
+  const std::vector<std::string> Parser::expressionList()
   {
+    std::vector<std::string> expressionListDataTypes;
     Token nextToken = m_lexer.peekNextToken();
     if (isExpression(nextToken))
     {
-      expression();
+      expressionListDataTypes.push_back(expression());
       while ((nextToken = m_lexer.peekNextToken()).m_lexeme == ",")
       {
         m_lexer.getNextToken();
-        expression();
+        expressionListDataTypes.push_back(expression());
       }
     }
+    
+    return expressionListDataTypes;
   }
 
   std::string Parser::relationalExpression()
@@ -666,16 +745,14 @@ namespace JackCompiler
         {
           symbolName = symbolName + "." + token.m_lexeme;
 
-          operandTypePair = m_symbolTables.getSymbolType(prefixSymbolName);
+          operandTypePair = m_symbolTables.getSymbolType(prefixSymbolName, m_className);
           found = operandTypePair.first;
           if (found)
           {
             symbolName = operandTypePair.second + "." + token.m_lexeme;
           }
-
-          determineIfNeedsToBeResolved(symbolName, Symbol::SymbolKind::FUNCTION);
           
-          auto operandTypePair = m_symbolTables.getSymbolType(symbolName);
+          operandTypePair = m_symbolTables.getSymbolType(symbolName);
           operandType = operandTypePair.first ? operandTypePair.second : "any";
 
           if (m_symbolTables.getSymbolType(operandTypePair.second).first && !m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::FUNCTION))
@@ -712,9 +789,20 @@ namespace JackCompiler
       }
       else if (nextToken.m_lexeme == "(")
       {
+        if (symbolName.find(".") == std::string::npos)
+          symbolName = m_className + "." + symbolName;
+
+        const std::vector<std::string>* parameterList = m_symbolTables.getParameterList(symbolName);
+
         m_lexer.getNextToken();
-        //TODO: semantic analysis on expression list
-        expressionList();
+        auto expressionListDataTypes = expressionList();
+
+        //TODO: Do analysis here aswell
+        determineIfNeedsToBeResolved(symbolName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
+
+        //Compare the expression list against the parameter list
+        compareArgumentListToParameterList(parameterList, expressionListDataTypes);
+        
         Token token = m_lexer.getNextToken();
         if (token.m_lexeme == ")")
         {

@@ -20,11 +20,12 @@ namespace JackCompiler
     std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
     std::string m_className;
     std::string m_filePath;
-    void resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind);
+    void resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind, const std::vector<std::string>* parameterList);
     bool isClassType(const std::string& symbolType) const;
     bool checkSymbolRedeclaration(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
     void resolveSymbols();
-    void determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind) const;
+    bool determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind, std::pair<bool, std::vector<std::string>> parameterList);
+    void compareArgumentListToParameterList(const std::vector<std::string>* parameterList, const std::vector<std::string>& expressionListDataTypes) const;
 
     void jackProgram();
     void classDefinition();
@@ -44,7 +45,8 @@ namespace JackCompiler
     //returns a data type of the expression for semantic analyser
     std::string expression();
     void subroutineCall();
-    void expressionList();
+    //returns a list of data types for checking parameter lists when calling functions
+    const std::vector<std::string> expressionList();
     std::string relationalExpression();
     std::string arithmeticExpression();
     std::string term();

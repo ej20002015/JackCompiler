@@ -78,6 +78,7 @@ namespace JackCompiler
     std::list<std::shared_ptr<Symbol>> getSymbols() const { return m_symbols; };
     const std::string getTableName() const { return m_tableName; }
     std::pair<bool, std::string> getSymbolType(const std::string& name) const;
+    const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
 
     static const unsigned m_numOfDifferentOffsets = 3;
     //used as array indexes - do not change
@@ -126,6 +127,8 @@ namespace JackCompiler
     std::pair<bool, std::string> getSymbolType(const std::string& name) const;
     std::pair<bool, std::string> getSymbolType(const std::string& name, const std::string& className) const;
     const std::list<std::shared_ptr<SymbolTable>>& getSymbolTables() const { return m_symbolTables; }
+    const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
+    const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName, const std::string& className) const;
 
     friend std::ostream& operator << (std::ostream& out, const SymbolTables& symbolTables);
 
@@ -146,11 +149,23 @@ namespace JackCompiler
     std::string m_fileName;
     unsigned m_lineNum;
     Symbol::SymbolKind m_kind;
+    //the bool indicates whether the vector should be compared against
+    std::pair<bool, std::vector<std::string>> m_parameterList;
+
+    SymbolToBeResolved() : m_name(""), m_fileName(""), m_lineNum(0), m_kind(Symbol::SymbolKind::ARGUMENT), m_parameterList(std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>())) {}
+    SymbolToBeResolved(const std::string& name, const std::string& fileName, unsigned lineNum, Symbol::SymbolKind kind, std::pair<bool, std::vector<std::string>> parameterList) : m_name(name), m_fileName(fileName), m_lineNum(lineNum), m_kind(kind), m_parameterList(parameterList) {}
   };
 
   inline std::ostream& operator << (std::ostream& out, const SymbolToBeResolved& symbolToBeResolved)
 	{
-    out << "<" << symbolToBeResolved.m_name << ", " << symbolToBeResolved.m_fileName << ", " << symbolToBeResolved.m_lineNum << Symbol::m_symbolKindMapping.at(symbolToBeResolved.m_kind) << std::endl;
-		return out;
+    out << "<" << symbolToBeResolved.m_name << ", " << symbolToBeResolved.m_fileName << ", " << symbolToBeResolved.m_lineNum << Symbol::m_symbolKindMapping.at(symbolToBeResolved.m_kind) << ", <";
+    if (symbolToBeResolved.m_parameterList.first)
+      for (int i = 0; i < symbolToBeResolved.m_parameterList.second.size(); ++i)
+      {
+        out << symbolToBeResolved.m_parameterList.second.at(i);
+        if (i < symbolToBeResolved.m_parameterList.second.size() - 1)
+          out << ", ";
+      }
+      return out << ">>" << std::endl;
 	}
 }

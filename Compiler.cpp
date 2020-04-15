@@ -38,7 +38,7 @@ namespace JackCompiler
     m_symbolTables.addToSymbolTables("Memory.peek", Symbol::SymbolKind::FUNCTION, "int", {"int"});
     m_symbolTables.addToSymbolTables("Memory.poke", Symbol::SymbolKind::FUNCTION, "void", {"int", "int"});
     m_symbolTables.addToSymbolTables("Memory.alloc", Symbol::SymbolKind::FUNCTION, "Array", {"int"});
-    m_symbolTables.addToSymbolTables("Memory.deAlloc", Symbol::SymbolKind::FUNCTION, "void", {"Array"});
+    m_symbolTables.addToSymbolTables("Memory.deAlloc", Symbol::SymbolKind::FUNCTION, "void", {"any"});
 
     //add Screen class subroutines
     m_symbolTables.addSymbolTable(SymbolTable("Screen"));

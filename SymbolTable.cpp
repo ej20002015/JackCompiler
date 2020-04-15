@@ -128,6 +128,18 @@ namespace JackCompiler
     return std::pair<bool, std::string>{false, "NO SUCH SYMBOL"};
   }
 
+  const std::vector<std::string>* SymbolTable::getParameterList(const std::string& subroutineSymbolName) const
+  {
+    for (auto symbol : m_symbols)
+    {
+      const std::vector<std::string>* parameterList = symbol->getParameterList();
+      if (parameterList && symbol->m_name == subroutineSymbolName)
+        return parameterList;
+    }
+
+    return nullptr;
+  }
+
   void SymbolTables::addSymbolTable(const SymbolTable& newSymbolTable)
   {
     m_symbolTables.push_back(std::make_shared<SymbolTable>(SymbolTable(newSymbolTable)));
@@ -254,5 +266,38 @@ namespace JackCompiler
     }
 
     return std::pair<bool, std::string>{false, "NO SUCH SYMBOL"};
+  }
+
+  const std::vector<std::string>* SymbolTables::getParameterList(const std::string& subroutineSymbolName) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      const std::vector<std::string>* parameterList = symbolTable->getParameterList(subroutineSymbolName);
+      if (parameterList)
+        return parameterList;
+    }
+
+    return nullptr;
+  }
+
+  const std::vector<std::string>* SymbolTables::getParameterList(const std::string& subroutineSymbolName, const std::string& className) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      const std::vector<std::string>* parameterList = symbolTable->getParameterList(subroutineSymbolName);
+      if (parameterList)
+        return parameterList;
+    }
+
+    std::string symbolWithClassName = className + "." + subroutineSymbolName;
+
+    for (auto symbolTable : m_symbolTables)
+    {
+      const std::vector<std::string>* parameterList = symbolTable->getParameterList(symbolWithClassName);
+      if (parameterList)
+        return parameterList;
+    }
+
+    return nullptr;
   }
 }
