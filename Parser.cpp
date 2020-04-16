@@ -267,12 +267,18 @@ namespace JackCompiler
             m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterListTypes);
             m_scopeReturnType = newSymbolType;
             m_symbolTables.addSymbolTable(SymbolTable());
+            //if the subroutine is a method then make its first argument this
+            if (newSymbolKind == Symbol::SymbolKind::METHOD)
+            {
+              m_symbolTables.addToSymbolTables("this", Symbol::SymbolKind::ARGUMENT, m_className);
+            }
             //add arguments to table
             for (int i = 0; i < newSymbolParameterListTypes.size(); ++i)
             {
               m_symbolTables.addToSymbolTables(newSymbolParameterListNames.at(i), Symbol::SymbolKind::ARGUMENT, newSymbolParameterListTypes.at(i));  
             }
-            body();
+            if (!body())
+              compilerError("Not all code paths in the subroutine contain a return statement", m_lexer.getLineNum(), "}");
             //remove symbol table for this subroutine scope
             m_symbolTables.removeCurrentSymbolTable();
           }
@@ -344,11 +350,14 @@ namespace JackCompiler
     return std::pair<std::vector<std::string>, std::vector<std::string>>{parameterListTypes, parameterListNames};
   }
 
-  void Parser::body()
+  bool Parser::body()
   {
     Token token = m_lexer.getNextToken();
+    bool bodyReturnedValue;
     if (token.m_lexeme == "{")
     {
+      bodyReturnedValue = m_returnsValue;
+      m_returnsValue = false;
       Token nextToken = m_lexer.peekNextToken();
       while (nextToken.m_lexeme == "var" || nextToken.m_lexeme == "let" || nextToken.m_lexeme == "if" || nextToken.m_lexeme == "while" || nextToken.m_lexeme == "do" || nextToken.m_lexeme == "return")
       {
@@ -363,6 +372,10 @@ namespace JackCompiler
     }
     else
       compilerError("Expected the SYMBOL '{' at this position", m_lexer.getLineNum(), token.m_lexeme);
+
+    bool temp = m_returnsValue;
+    m_returnsValue = bodyReturnedValue;
+    return temp;
   }
 
   void Parser::statement()
@@ -459,8 +472,12 @@ namespace JackCompiler
           auto symbolTypePair = m_symbolTables.getSymbolType(symbolName, m_className);
           if (leftHandSideType != "any")
             leftHandSideType = symbolTypePair.second;
-          if (symbolTypePair.first != true || (leftHandSideType != expressionType && (!(leftHandSideType == "char" && expressionType == "int") && !(leftHandSideType == "int" && expressionType == "char")) && expressionType != "any") && leftHandSideType != "any")
-            compilerError("Expression on the right hand side of the assignment does not match the data type of the variable", m_lexer.getLineNum(), symbolName);
+          
+          if (m_lexer.peekNextToken().m_lexeme != ".")
+          {
+            if (symbolTypePair.first != true || (leftHandSideType != expressionType && (!(leftHandSideType == "char" && expressionType == "int") && !(leftHandSideType == "int" && expressionType == "char")) && expressionType != "any") && leftHandSideType != "any")
+              compilerError("Expression on the right hand side of the assignment does not match the data type of the variable", m_lexer.getLineNum(), symbolName);
+          }
 
           if ((token = m_lexer.getNextToken()).m_lexeme == ";")
           {
@@ -483,6 +500,8 @@ namespace JackCompiler
   void Parser::ifStatement()
   {
     Token token = m_lexer.getNextToken();
+    bool ifPortionReturned = false;
+    bool elsePortionReturned = false;
     if (token.m_lexeme == "if")
     {
       if ((token = m_lexer.getNextToken()).m_lexeme == "(")
@@ -490,13 +509,16 @@ namespace JackCompiler
         expression();
         if ((token = m_lexer.getNextToken()).m_lexeme == ")")
         {
-          body();
+          ifPortionReturned = body();
           Token nextToken = m_lexer.peekNextToken();
           if (nextToken.m_lexeme == "else")
           {
             m_lexer.getNextToken();
-            body();
+            elsePortionReturned = body();
           }
+
+          if (ifPortionReturned && elsePortionReturned)
+            m_returnsValue = true;
         }
         else
           compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -565,6 +587,7 @@ namespace JackCompiler
       
       if ((token = m_lexer.getNextToken()).m_lexeme == ";")
       {
+        m_returnsValue = true;
       }
       else
         compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);

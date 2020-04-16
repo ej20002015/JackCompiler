@@ -11,7 +11,7 @@ namespace JackCompiler
   class Parser
   {
   public:
-    Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved), m_filePath(filePath) {}
+    Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved), m_filePath(filePath), m_returnsValue(false) {}
     void parse();
 
   private:
@@ -21,6 +21,7 @@ namespace JackCompiler
     std::string m_className;
     std::string m_filePath;
     std::string m_scopeReturnType;
+    bool m_returnsValue;
     void resolveSymbol(const std::string& name, const Symbol::SymbolKind& symbolKind, const std::vector<std::string>* parameterList);
     bool isClassType(const std::string& symbolType) const;
     bool checkSymbolRedeclaration(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
@@ -35,7 +36,8 @@ namespace JackCompiler
     void subroutineDefinition();
     void type();
     const std::pair<std::vector<std::string>, std::vector<std::string>> parameterList();
-    void body();
+    //returns a boolean indicating whether that body returns a value in all code paths
+    bool body();
     void statement();
     void variableDeclarationStatement();
     void letStatement();
