@@ -361,6 +361,8 @@ namespace JackCompiler
       Token nextToken = m_lexer.peekNextToken();
       while (nextToken.m_lexeme == "var" || nextToken.m_lexeme == "let" || nextToken.m_lexeme == "if" || nextToken.m_lexeme == "while" || nextToken.m_lexeme == "do" || nextToken.m_lexeme == "return")
       {
+        if (m_returnsValue)
+          compilerError("Code following this point is unreachable and redundant", m_lexer.getLineNum(), nextToken.m_lexeme);
         statement();
         nextToken = m_lexer.peekNextToken();
       }
