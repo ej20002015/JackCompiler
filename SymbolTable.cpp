@@ -140,6 +140,17 @@ namespace JackCompiler
     return nullptr;
   }
 
+  std::pair<int, Symbol::SymbolKind> SymbolTable::getOffsetAndKind(const std::string& symbolName) const
+  {
+    for (auto symbol : m_symbols)
+    {
+      if (symbol->m_name == symbolName)
+        return std::pair<int , Symbol::SymbolKind>(symbol->m_offset, symbol->m_kind);
+    }
+
+    return std::pair<int, Symbol::SymbolKind>(-1, Symbol::SymbolKind::ARGUMENT);
+  }
+
   void SymbolTables::addSymbolTable(const SymbolTable& newSymbolTable)
   {
     m_symbolTables.push_back(std::make_shared<SymbolTable>(SymbolTable(newSymbolTable)));
@@ -299,5 +310,17 @@ namespace JackCompiler
     }
 
     return nullptr;
+  }
+
+  std::pair<int, Symbol::SymbolKind> SymbolTables::getOffsetAndKind(const std::string& symbolName) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto offsetAndKind = symbolTable->getOffsetAndKind(symbolName);
+      if (offsetAndKind.first != -1)
+        return offsetAndKind;
+    }
+
+    return std::pair<int, Symbol::SymbolKind>(-1, Symbol::SymbolKind::ARGUMENT);
   }
 }

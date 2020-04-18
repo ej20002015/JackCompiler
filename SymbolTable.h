@@ -79,6 +79,7 @@ namespace JackCompiler
     const std::string getTableName() const { return m_tableName; }
     std::pair<bool, std::string> getSymbolType(const std::string& name) const;
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
+    std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName) const;
 
     static const unsigned m_numOfDifferentOffsets = 3;
     //used as array indexes - do not change
@@ -129,6 +130,7 @@ namespace JackCompiler
     const std::list<std::shared_ptr<SymbolTable>>& getSymbolTables() const { return m_symbolTables; }
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName, const std::string& className) const;
+    std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName) const;
 
     friend std::ostream& operator << (std::ostream& out, const SymbolTables& symbolTables);
 

@@ -87,7 +87,7 @@ namespace JackCompiler
       }
       else
       {
-        if (!m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, Symbol::SymbolKind::FUNCTION))
+        if (!m_symbolTables.checkSymbolExistsInAllSymbolTables(symbolName, symbolKind))
         {
           m_symbolsToBeResolved.push_back({symbolName, m_filePath, m_lexer.getLineNum(), symbolKind, parameterList});
           return true;
@@ -115,6 +115,12 @@ namespace JackCompiler
     }
   }
 
+  void Parser::printOutputCodeToConsole()
+  {
+    for (std::string codeLine : m_outputCode)
+      std::cout << codeLine << std::endl;
+  }
+
   void Parser::jackProgram()
   {
     //if file is empty
@@ -128,7 +134,8 @@ namespace JackCompiler
     }
     else
       compilerError("Expected the EOF token at this position", m_lexer.getLineNum(), token.m_lexeme);
-  
+    
+    printOutputCodeToConsole();
   }
 
   void Parser::classDefinition()
@@ -262,7 +269,6 @@ namespace JackCompiler
           std::vector<std::string> newSymbolParameterListNames = newSymbolParameterListPair.second;
           if ((token = m_lexer.getNextToken()).m_lexeme == ")")
           {
-            //TODO: go through body statements
             //make new symbol table for this subroutine scope
             m_symbolTables.addToSymbolTables(newSymbolName, newSymbolKind, newSymbolType, newSymbolParameterListTypes);
             m_scopeReturnType = newSymbolType;
@@ -758,7 +764,8 @@ namespace JackCompiler
     if (nextToken.m_tokenType == Token::TokenType::INTEGERCONSTANT)
     {
       operandType = "int";
-      m_lexer.getNextToken();
+      std::string intToPush = m_lexer.getNextToken().m_lexeme;
+      m_outputCode.push_back("push constant " + intToPush);
     }
     else if (nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
@@ -798,12 +805,26 @@ namespace JackCompiler
         else
           compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
       }
+      else if (nextToken.m_lexeme == "(")
+      {
+        symbolName = m_className + "." + symbolName;
+      }
 
       if (symbolName.find('.') == std::string::npos && !m_symbolTables.getSymbolType(symbolName, m_className).first)
         compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
 
       if (!m_symbolTables.checkSymbolInitialised(symbolName, m_className) && symbolName.find('.') == std::string::npos)
-        compilerError("Symbol has not been initialised", m_lexer.getLineNum(), symbolName);
+        compilerError("IDENTIFIER has not been initialised", m_lexer.getLineNum(), symbolName);
+      
+      if (symbolName.find('.') == std::string::npos)
+      {
+        auto offsetAndKind = m_symbolTables.getOffsetAndKind(symbolName);
+
+        if (offsetAndKind.second == Symbol::SymbolKind::ARGUMENT)
+          m_outputCode.push_back("push argument " + std::to_string(offsetAndKind.first));
+        else
+          m_outputCode.push_back("push local " + std::to_string(offsetAndKind.first));
+      }
 
       nextToken = m_lexer.peekNextToken(); 
       if (nextToken.m_lexeme == "[")
@@ -840,6 +861,7 @@ namespace JackCompiler
         Token token = m_lexer.getNextToken();
         if (token.m_lexeme == ")")
         {
+          m_outputCode.push_back("call " + symbolName + " " + std::to_string(expressionListDataTypes.size()));
         }
         else
           compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -860,26 +882,31 @@ namespace JackCompiler
     {
       m_lexer.getNextToken();
       operandType = "String";
+      //TODO: get vm code for string constants
     }
     else if (nextToken.m_lexeme == "true")
     {
       m_lexer.getNextToken();
       operandType = "boolean";
+      m_outputCode.push_back("push constant 1");
     }
     else if (nextToken.m_lexeme == "false")
     {
       m_lexer.getNextToken();
       operandType = "boolean";
+      m_outputCode.push_back("push constant 0");
     }
     else if (nextToken.m_lexeme == "null")
     {
       m_lexer.getNextToken();
       operandType = "any";
+      m_outputCode.push_back("push constant 0");
     }
     else if (nextToken.m_lexeme == "this")
     {
       m_lexer.getNextToken();
       operandType = m_className;
+      m_outputCode.push_back("push argument 0");
     }
     else
       compilerError("Expected an INTEGERCONSTANT, an IDENTIFIER, the SYMBOL '(', a STRINGCONSTANT, the KEYWORD 'true', the KEYWORD 'false', the KEYWORD 'null' or the KEYWORD 'this' at this position", m_lexer.getLineNum(), nextToken.m_lexeme);

@@ -17,6 +17,7 @@ namespace JackCompiler
   private:
     Lexer m_lexer;
     SymbolTables& m_symbolTables;
+    std::vector<std::string> m_outputCode;
     std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
     std::string m_className;
     std::string m_filePath;
@@ -28,6 +29,8 @@ namespace JackCompiler
     void resolveSymbols();
     bool determineIfNeedsToBeResolved(const std::string& symbolName, const Symbol::SymbolKind& symbolKind, std::pair<bool, std::vector<std::string>> parameterList);
     void compareArgumentListToParameterList(const std::vector<std::string>* parameterList, const std::vector<std::string>& expressionListDataTypes) const;
+
+    void printOutputCodeToConsole();
 
     void jackProgram();
     void classDefinition();
