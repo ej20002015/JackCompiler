@@ -323,4 +323,25 @@ namespace JackCompiler
 
     return std::pair<int, Symbol::SymbolKind>(-1, Symbol::SymbolKind::ARGUMENT);
   }
+
+  std::pair<int, Symbol::SymbolKind> SymbolTables::getOffsetAndKind(const std::string& symbolName, const std::string& className) const
+  {
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto offsetAndKind = symbolTable->getOffsetAndKind(symbolName);
+      if (offsetAndKind.first != -1)
+        return offsetAndKind;
+    }
+
+    std::string symbolWithClassName = className + "." + symbolName;
+
+    for (auto symbolTable : m_symbolTables)
+    {
+      auto offsetAndKind = symbolTable->getOffsetAndKind(symbolWithClassName);
+      if (offsetAndKind.first != -1)
+        return offsetAndKind;
+    }
+
+    return std::pair<int, Symbol::SymbolKind>(-1, Symbol::SymbolKind::ARGUMENT);
+  }
 }

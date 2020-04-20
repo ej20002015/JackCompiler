@@ -11,13 +11,17 @@ namespace JackCompiler
   class Parser
   {
   public:
-    Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved), m_filePath(filePath), m_returnsValue(false) {}
+    Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved), m_filePath(filePath), m_returnsValue(false), m_labelCount(0), m_numLocalVariables(0), m_numFieldVariables(0), m_indexOfNumOfFieldsCode(0) {}
     void parse();
 
   private:
     Lexer m_lexer;
     SymbolTables& m_symbolTables;
     std::vector<std::string> m_outputCode;
+    int m_labelCount;
+    int m_numLocalVariables;
+    int m_numFieldVariables;
+    int m_indexOfNumOfFieldsCode;
     std::list<SymbolToBeResolved>& m_symbolsToBeResolved;
     std::string m_className;
     std::string m_filePath;
@@ -31,6 +35,7 @@ namespace JackCompiler
     void compareArgumentListToParameterList(const std::vector<std::string>* parameterList, const std::vector<std::string>& expressionListDataTypes) const;
 
     void printOutputCodeToConsole();
+    int getLabelCount() { return m_labelCount++; }
 
     void jackProgram();
     void classDefinition();
