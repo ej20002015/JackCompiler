@@ -3,6 +3,7 @@
 #include <iostream>
 #include <dirent.h>
 #include <algorithm>
+#include <fstream>
 
 #include "Core.h"
 #include "Lexer.h"
@@ -125,12 +126,38 @@ namespace JackCompiler
 		return 0;
 	}
 
+  void Compiler::writeOutputCodeToConsole(const std::vector<std::string>& outputCode) const
+  {
+    for (std::string codeLine : outputCode)
+      std::cout << codeLine << std::endl;
+  }
+
+  void Compiler::writeOutputCodeToFile(const std::string& filePath, const std::vector<std::string>& outputCode) const
+  {
+    std::ofstream outputFile(filePath);
+    if (outputFile.is_open())
+    {
+      for (std::string codeLine : outputCode)
+        outputFile << codeLine << std::endl;
+      
+      outputFile.close();
+    }
+    else
+      compilerError("Unable to output code to file '" + filePath + "'");   
+  }
+
 	void Compiler::compileFile(const std::string& filePath)
 	{
 		std::cout << "Compiling file " << filePath << "..." << std::endl;
 		std::cout << std::endl;
 		Parser parser(filePath, m_symbolTables, m_symbolsToBeResolved);
 		parser.parse();
+    auto outputCode = parser.getOutputCode();
+    writeOutputCodeToConsole(outputCode);
+    std::string fileName = filePath.substr(filePath.find_last_of("\\/") + 1, filePath.length());
+    fileName = fileName.substr(0, fileName.find_last_of("."));
+    std::string outputFilePath = filePath.substr(0, filePath.find_last_of("\\/") + 1).append(fileName + ".vm");
+    writeOutputCodeToFile(outputFilePath, outputCode);
 		std::cout << std::endl;
 	}
 }

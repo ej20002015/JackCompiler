@@ -115,12 +115,6 @@ namespace JackCompiler
     }
   }
 
-  void Parser::printOutputCodeToConsole()
-  {
-    for (std::string codeLine : m_outputCode)
-      std::cout << codeLine << std::endl;
-  }
-
   void Parser::jackProgram()
   {
     //if file is empty
@@ -134,8 +128,6 @@ namespace JackCompiler
     }
     else
       compilerError("Expected the EOF token at this position", m_lexer.getLineNum(), token.m_lexeme);
-    
-    printOutputCodeToConsole();
   }
 
   void Parser::classDefinition()
@@ -586,25 +578,25 @@ namespace JackCompiler
     if (token.m_lexeme == "if")
     {
       std::string labelCount = std::to_string(getLabelCount());
-      m_outputCode.push_back("label if" + labelCount + ":");
+      m_outputCode.push_back("label IF" + labelCount);
       if ((token = m_lexer.getNextToken()).m_lexeme == "(")
       {
         expression();
         m_outputCode.push_back("not");
-        m_outputCode.push_back("if-goto else" + labelCount);
+        m_outputCode.push_back("if-goto ELSE" + labelCount);
         if ((token = m_lexer.getNextToken()).m_lexeme == ")")
         {
           ifPortionReturned = body();
-          m_outputCode.push_back("goto end" + labelCount);
-          m_outputCode.push_back("label else" + labelCount);
+          m_outputCode.push_back("goto END" + labelCount);
+          m_outputCode.push_back("label ELSE" + labelCount);
           Token nextToken = m_lexer.peekNextToken();
           if (nextToken.m_lexeme == "else")
           {
             m_lexer.getNextToken();
             elsePortionReturned = body();
           }
-          m_outputCode.push_back("goto end" + labelCount);
-          m_outputCode.push_back("label end" + labelCount);
+          m_outputCode.push_back("goto END" + labelCount);
+          m_outputCode.push_back("label END" + labelCount);
 
           if (ifPortionReturned && elsePortionReturned)
             m_returnsValue = true;
@@ -625,17 +617,17 @@ namespace JackCompiler
     if (token.m_lexeme == "while")
     {
       std::string labelCount = std::to_string(getLabelCount());
-      m_outputCode.push_back("label loop" + labelCount + ":");
+      m_outputCode.push_back("label LOOP" + labelCount);
       if ((token = m_lexer.getNextToken()).m_lexeme == "(")
       {
         expression();
         m_outputCode.push_back("not");
-        m_outputCode.push_back("if-goto end" + labelCount);
+        m_outputCode.push_back("if-goto END" + labelCount);
         if ((token = m_lexer.getNextToken()).m_lexeme == ")")
         {
           body();
-          m_outputCode.push_back("goto loop" + labelCount);
-          m_outputCode.push_back("label end" + labelCount);
+          m_outputCode.push_back("goto LOOP" + labelCount);
+          m_outputCode.push_back("label END" + labelCount);
         }
         else
           compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);

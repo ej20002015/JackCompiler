@@ -13,6 +13,7 @@ namespace JackCompiler
   public:
     Parser(const std::string& filePath, SymbolTables& symbolTables, std::list<SymbolToBeResolved>& symbolsToBeResolved) : m_lexer(filePath), m_symbolTables(symbolTables), m_symbolsToBeResolved(symbolsToBeResolved), m_filePath(filePath), m_returnsValue(false), m_labelCount(0), m_numLocalVariables(0), m_numFieldVariables(0), m_indexOfNumOfFieldsCode(-1) {}
     void parse();
+    const std::vector<std::string>& getOutputCode() const { return m_outputCode; }
 
   private:
     Lexer m_lexer;
