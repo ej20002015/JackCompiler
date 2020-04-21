@@ -162,8 +162,9 @@ namespace JackCompiler
           }
           if ((token = m_lexer.getNextToken()).m_lexeme == "}")
           {
-            //Set the number of words to allocate for the class
-            m_outputCode.at(m_indexOfNumOfFieldsCode).append(std::to_string(m_numFieldVariables));
+            //Set the number of words to allocate for the class if a constructor encountered
+            if (m_indexOfNumOfFieldsCode != -1)
+              m_outputCode.at(m_indexOfNumOfFieldsCode).append(std::to_string(m_numFieldVariables));
 
             resolveSymbols();
             m_numFieldVariables = 0;
@@ -214,20 +215,24 @@ namespace JackCompiler
         //create new symbol
         m_symbolTables.addToSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind, newSymbolType);
 
+        m_numFieldVariables++;
+
         while ((token = m_lexer.getNextToken()).m_lexeme == ",")
         {
           if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
           {
             if (checkSymbolRedeclaration(m_className + "." + token.m_lexeme, newSymbolKind))
               compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
+
             m_symbolTables.addToSymbolTables(m_className + "." + token.m_lexeme, newSymbolKind, newSymbolType);
+
+            m_numFieldVariables++;
           }
           else
             compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);
         }
         if (token.m_lexeme == ";")
         {
-          m_numFieldVariables++;
         }
         else
           compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -451,6 +456,7 @@ namespace JackCompiler
         
         //add token to subroutine scope symbol table
         m_symbolTables.addToSymbolTables(token.m_lexeme, Symbol::SymbolKind::VAR, newSymbolType);
+        m_numLocalVariables++;
 
         while ((token = m_lexer.getNextToken()).m_lexeme == ",")
         {
@@ -460,13 +466,13 @@ namespace JackCompiler
               compilerError("IDENTIFIER has already been declared", m_lexer.getLineNum(), token.m_lexeme);
 
             m_symbolTables.addToSymbolTables(token.m_lexeme, Symbol::SymbolKind::VAR, newSymbolType);
+            m_numLocalVariables++;
           }
           else
             compilerError("Expected an IDENTIFIER at this position", m_lexer.getLineNum(), token.m_lexeme);    
         }
         if (token.m_lexeme == ";")
         {
-          m_numLocalVariables++;
         }
         else
           compilerError("Expected the SYMBOL ';' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -758,21 +764,31 @@ namespace JackCompiler
           auto offsetAndKind = m_symbolTables.getOffsetAndKind(prefixFunctionName, m_className);
 
           if (offsetAndKind.first == -1)
-            compilerError("Cannot get offset of variable", m_lexer.getLineNum(), prefixFunctionName);
-
-          if (offsetAndKind.second == Symbol::SymbolKind::FIELD)
-          {
-            m_outputCode.push_back("push this " + std::to_string(offsetAndKind.first));
-          }
-          else if (offsetAndKind.second == Symbol::SymbolKind::STATIC)
-            m_outputCode.push_back("push static " + std::to_string(offsetAndKind.first));
-          else if (offsetAndKind.second == Symbol::SymbolKind::ARGUMENT)
-            m_outputCode.push_back("push argument " + std::to_string(offsetAndKind.first));
+            m_outputCode.push_back("push pointer 0");
           else
-            m_outputCode.push_back("push local " + std::to_string(offsetAndKind.first));
+          {
+            if (offsetAndKind.second == Symbol::SymbolKind::FIELD)
+            {
+              m_outputCode.push_back("push this " + std::to_string(offsetAndKind.first));
+            }
+            else if (offsetAndKind.second == Symbol::SymbolKind::STATIC)
+              m_outputCode.push_back("push static " + std::to_string(offsetAndKind.first));
+            else if (offsetAndKind.second == Symbol::SymbolKind::ARGUMENT)
+              m_outputCode.push_back("push argument " + std::to_string(offsetAndKind.first));
+            else if (offsetAndKind.second == Symbol::SymbolKind::VAR)
+              m_outputCode.push_back("push local " + std::to_string(offsetAndKind.first));
+            else
+              m_outputCode.push_back("push argument 0" + std::to_string(offsetAndKind.first));
+          }
         }
         
+        int argumentCount = 0;
+
+        if(callingAMethod)
+          argumentCount++;
+
         const std::vector<std::string> expressionListDataTypes = expressionList();
+        argumentCount += expressionListDataTypes.size();
         determineIfNeedsToBeResolved(functionName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
 
         //Compare the expression list against the parameter list
@@ -780,7 +796,7 @@ namespace JackCompiler
 
         if ((token = m_lexer.getNextToken()).m_lexeme == ")")
         {
-          m_outputCode.push_back("call " + functionName + " " + std::to_string(expressionListDataTypes.size()));
+          m_outputCode.push_back("call " + functionName + " " + std::to_string(argumentCount));
         }
         else
           compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
@@ -911,6 +927,7 @@ namespace JackCompiler
     }
     else if (nextToken.m_tokenType == Token::TokenType::IDENTIFIER)
     {
+      bool callingAMethod = false;
       std::string symbolName = nextToken.m_lexeme;
       std::string prefixSymbolName = nextToken.m_lexeme;
       auto operandTypePair = m_symbolTables.getSymbolType(symbolName, m_className);
@@ -934,6 +951,7 @@ namespace JackCompiler
           if (found)
           {
             symbolName = operandTypePair.second + "." + token.m_lexeme;
+            callingAMethod = true;
           }
           
           operandTypePair = m_symbolTables.getSymbolType(symbolName);
@@ -950,6 +968,7 @@ namespace JackCompiler
       else if (nextToken.m_lexeme == "(")
       {
         symbolName = m_className + "." + symbolName;
+        callingAMethod = true;
       }
 
       if (symbolName.find('.') == std::string::npos && !m_symbolTables.getSymbolType(symbolName, m_className).first)
@@ -961,20 +980,40 @@ namespace JackCompiler
       if (symbolName.find('.') == std::string::npos)
       {
         auto offsetAndKind = m_symbolTables.getOffsetAndKind(symbolName, m_className);
-
+        
         if (offsetAndKind.second == Symbol::SymbolKind::FIELD)
-        {
-          //set this pointer to point at the this object
-          //m_outputCode.push_back("push argument 0");
-          //m_outputCode.push_back("pop pointer 0");
           m_outputCode.push_back("push this " + std::to_string(offsetAndKind.first));
-        }
         else if (offsetAndKind.second == Symbol::SymbolKind::STATIC)
           m_outputCode.push_back("push static " + std::to_string(offsetAndKind.first));
         else if (offsetAndKind.second == Symbol::SymbolKind::ARGUMENT)
           m_outputCode.push_back("push argument " + std::to_string(offsetAndKind.first));
         else
           m_outputCode.push_back("push local " + std::to_string(offsetAndKind.first));
+      }
+      else
+      {
+        if (callingAMethod)
+        {
+          auto offsetAndKind = m_symbolTables.getOffsetAndKind(prefixSymbolName, m_className);
+
+          if (offsetAndKind.first == -1)
+            m_outputCode.push_back("push pointer 0");
+          else
+          {
+            if (offsetAndKind.second == Symbol::SymbolKind::FIELD)
+            {
+              m_outputCode.push_back("push this " + std::to_string(offsetAndKind.first));
+            }
+            else if (offsetAndKind.second == Symbol::SymbolKind::STATIC)
+              m_outputCode.push_back("push static " + std::to_string(offsetAndKind.first));
+            else if (offsetAndKind.second == Symbol::SymbolKind::ARGUMENT)
+              m_outputCode.push_back("push argument " + std::to_string(offsetAndKind.first));
+            else if (offsetAndKind.second == Symbol::SymbolKind::VAR)
+              m_outputCode.push_back("push local " + std::to_string(offsetAndKind.first));
+            else
+              m_outputCode.push_back("push argument 0" + std::to_string(offsetAndKind.first));
+          }
+        }
       }
 
       nextToken = m_lexer.peekNextToken(); 
@@ -1000,13 +1039,17 @@ namespace JackCompiler
       }
       else if (nextToken.m_lexeme == "(")
       {
-        if (symbolName.find(".") == std::string::npos)
-          symbolName = m_className + "." + symbolName;
-
         const std::vector<std::string>* parameterList = m_symbolTables.getParameterList(symbolName);
 
         m_lexer.getNextToken();
+
+        int argumentCount = 0;
+
+        if(callingAMethod)
+          argumentCount++;
+
         auto expressionListDataTypes = expressionList();
+        argumentCount += expressionListDataTypes.size();
 
         determineIfNeedsToBeResolved(symbolName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
 
@@ -1016,7 +1059,7 @@ namespace JackCompiler
         Token token = m_lexer.getNextToken();
         if (token.m_lexeme == ")")
         {
-          m_outputCode.push_back("call " + symbolName + " " + std::to_string(expressionListDataTypes.size()));
+          m_outputCode.push_back("call " + symbolName + " " + std::to_string(argumentCount));
         }
         else
           compilerError("Expected the SYMBOL ')' at this position", m_lexer.getLineNum(), token.m_lexeme);
