@@ -153,7 +153,7 @@ namespace JackCompiler
 		Parser parser(filePath, m_symbolTables, m_symbolsToBeResolved);
 		parser.parse();
     auto outputCode = parser.getOutputCode();
-    writeOutputCodeToConsole(outputCode);
+    //writeOutputCodeToConsole(outputCode);
     std::string fileName = filePath.substr(filePath.find_last_of("\\/") + 1, filePath.length());
     fileName = fileName.substr(0, fileName.find_last_of("."));
     std::string outputFilePath = filePath.substr(0, filePath.find_last_of("\\/") + 1).append(fileName + ".vm");

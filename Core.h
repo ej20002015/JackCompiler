@@ -8,6 +8,7 @@ namespace JackCompiler
 	void compilerError(const std::string& message);
 	void compilerError(const std::string& message, unsigned lineNum);
 	void compilerError(const std::string& message, unsigned lineNum, const std::string& lexeme);
+  void compilerWarning(const std::string& message, unsigned lineNum, const std::string& lexeme);
 
 	struct Token
 	{

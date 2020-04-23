@@ -396,7 +396,7 @@ namespace JackCompiler
       while (nextToken.m_lexeme == "var" || nextToken.m_lexeme == "let" || nextToken.m_lexeme == "if" || nextToken.m_lexeme == "while" || nextToken.m_lexeme == "do" || nextToken.m_lexeme == "return")
       {
         if (m_returnsValue)
-          compilerError("Code following this point is unreachable and redundant", m_lexer.getLineNum(), nextToken.m_lexeme);
+          compilerWarning("Code following this point is unreachable and redundant", m_lexer.getLineNum(), nextToken.m_lexeme);
         statement();
         nextToken = m_lexer.peekNextToken();
       }
@@ -967,7 +967,7 @@ namespace JackCompiler
         compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
 
       if (!m_symbolTables.checkSymbolInitialised(symbolName, m_className) && symbolName.find('.') == std::string::npos)
-        compilerError("IDENTIFIER has not been initialised", m_lexer.getLineNum(), symbolName);
+        compilerWarning("IDENTIFIER has not been initialised", m_lexer.getLineNum(), symbolName);
       
       if (symbolName.find('.') == std::string::npos)
       {

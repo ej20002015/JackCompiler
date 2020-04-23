@@ -20,6 +20,11 @@ namespace JackCompiler
 		exit(1);
 	}
 
+  void compilerWarning(const std::string& message, unsigned lineNum, const std::string& lexeme)
+  {
+    std::cout << "COMPILATION WARNING: (LINE " << lineNum << ") (AT TOKEN '" << lexeme << "') " << message << std::endl;
+  }
+
   Token::Token() : m_tokenType(TokenType::NONE), m_lexeme("")
   {
     m_tokenTypeMapping[TokenType::NONE]            = "NONE";
