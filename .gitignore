@@ -2,3 +2,4 @@ build
 testAll.sh
 *.zip
 .vscode
+.VSCodeCounter
