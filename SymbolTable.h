@@ -68,19 +68,53 @@ namespace JackCompiler
   class SymbolTable
   {
   public:
+    /**
+    * Create a symbol table with no name - used for subroutines
+    */
     SymbolTable() : m_tableName("No Name") {}
+    /**
+    * Create a symbol table with a name - used for classes
+    */ 
     SymbolTable(const std::string& tableName) : m_tableName(tableName) {}
+    /**
+    * Add a symbol to the table
+    */
     void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType);
+    /**
+    * Add a subroutine symbol to the table
+    */
     void addSymbol(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string>& parameterList);
+    /**
+    * Check if a certain symbol exists in the symbol table
+    */
     bool checkSymbolExists(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
+    /**
+    * Set a symbol as initialised
+    */
     void setSymbolInitialised(const std::string& name);
+    /**
+    * Returns a boolean indicating whether the given symbol is initialised
+    */
     bool checkSymbolInitialised(const std::string& name) const;
     std::list<std::shared_ptr<Symbol>> getSymbols() const { return m_symbols; };
     const std::string getTableName() const { return m_tableName; }
+    /**
+    * Given the name of a symbol return the type of the symbol along with a boolean indicating whether the symbol was found
+    */
     std::pair<bool, std::string> getSymbolType(const std::string& name) const;
+    /**
+    * Return the parameter list of a subroutine symbol
+    */
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
+    /**
+    * Get the offset and kind of a symbol with symbolName
+    */
     std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName) const;
+    /**
+    * Get the offset and kind of a symbol with symbolName or className.symbolName
+    */
     std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName, const std::string& className) const;
+    
 
     static const unsigned m_numOfDifferentOffsets = 3;
     //used as array indexes - do not change
@@ -95,6 +129,7 @@ namespace JackCompiler
     friend std::ostream& operator << (std::ostream& out, const std::shared_ptr<SymbolTable>& symbolTable);
 
   private:
+    //Initialise all the offsets to 0
     unsigned m_offsets[m_numOfDifferentOffsets] = {0};
     std::list<std::shared_ptr<Symbol>> m_symbols;
     std::string m_tableName;
@@ -114,24 +149,74 @@ namespace JackCompiler
   {
   public:
     void addSymbolTable(const SymbolTable& newSymbolTable);
+    /**
+    * Remove the current symbol table at the end of the list
+    */
     void removeCurrentSymbolTable();
+    /**
+    * Indicates if a symbol exists in all the symbol tables - used for calls to subroutines and field/static variables
+    */
     bool checkSymbolExistsInAllSymbolTables(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
-    //used to check declarations of local variables against local variables and arguments declared in the same scope
+    /**
+    * Indicates if a symbol exists in the current symbol table at the end of the list - used to check declarations of local variables against local variables and arguments declared in the same scope
+    */
     bool checkSymbolExistsInCurrentSymbolTable(const std::string& name, const Symbol::SymbolKind& symbolKind) const;
+    /**
+    * Returns a boolean indicating whether the className given is the same as a class that has already been declared
+    */
     bool checkClassDefined(const std::string& className) const;
+    /**
+    * Add a symbol to the current symbol table
+    */
     void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType);
+    /**
+    * Add a function symbol to the current symbol table
+    */
     void addToSymbolTables(const std::string symbolName, const Symbol::SymbolKind& symbolKind, const std::string& symbolType, const std::vector<std::string> parameterList);
+    /**
+    * Set the symbol given to initialised in the most localised scope (from subroutine symbol table back to class symbol tables) where the symbol name is just symbolName
+    */
     void setSymbolInitialised(const std::string& name);
+    /**
+    * Set the symbol given to initialised in the most localised scope (from subroutine symbol table back to class symbol tables) where the symbol name is symbolName and then className.symbolName
+    */
     void setSymbolInitialised(const std::string& name, const std::string& className);
+    /**
+    * Return a boolean indicating whether the symbol given is initialised in the most localised scope (from subroutine symbol table back to class symbol tables) where the symbol name is just symbolName
+    */
     bool checkSymbolInitialised(const std::string& name) const;
+    /**
+    * Return a boolean indicating whether the symbol given is initialised in the most localised scope (from subroutine symbol table back to class symbol tables) where the symbol name is symbolName and then className.symbolName
+    */
     bool checkSymbolInitialised(const std::string& name, const std::string& className) const;
+    /**
+    * Return the symbols from the current symbol table at the end of the list
+    */
     std::list<std::shared_ptr<Symbol>> getSymbolsFromCurrentSymbolTable() const { return m_symbolTables.back()->getSymbols(); };
+    /**
+    * Return the data type of the symbol given in the most localised scope (from subroutine symbol table back to class symbol tables) along with a boolean indicating whether the symbol was found. The symbol name is just symbolName.
+    */
     std::pair<bool, std::string> getSymbolType(const std::string& name) const;
+    /**
+    * Return the data type of the symbol given in the most localised scope (from subroutine symbol table back to class symbol tables) along with a boolean indicating whether the symbol was found. The symbol name is symbolName and then className.symbolName.
+    */
     std::pair<bool, std::string> getSymbolType(const std::string& name, const std::string& className) const;
     const std::list<std::shared_ptr<SymbolTable>>& getSymbolTables() const { return m_symbolTables; }
+    /**
+    * Return the parameterList of the given symbol in the most localised scope (from subroutine symbol table back to class symbol tables). The symbol name is only symbolName.
+    */
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName) const;
+    /**
+    * Return the parameterList of the given symbol in the most localised scope (from subroutine symbol table back to class symbol tables). The symbol name is symbolName and then className.symbolName.
+    */
     const std::vector<std::string>* getParameterList(const std::string& subroutineSymbolName, const std::string& className) const;
+    /**
+    * Return the offset (-1 if not found) of the given symbol along with its kind. Get a matching symbol from the most localised scope (from subroutine symbol table back to class symbol tables). The symbol name is only symbolName.
+    */
     std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName) const;
+    /**
+    * Return the offset (-1 if not found) of the given symbol along with its kind. Get a matching symbol from the most localised scope (from subroutine symbol table back to class symbol tables). The symbol name is symbolName and then className.symbolName.
+    */
     std::pair<int, Symbol::SymbolKind> getOffsetAndKind(const std::string& symbolName, const std::string& className) const;
 
     friend std::ostream& operator << (std::ostream& out, const SymbolTables& symbolTables);

@@ -94,6 +94,7 @@ namespace JackCompiler
         }
       }
     }
+
     return false;
   }
 
@@ -105,6 +106,7 @@ namespace JackCompiler
         compilerError("Argument list is not of the correct length", m_lexer.getLineNum(), "(");
       else
       {
+        //Go through the two lists comparing the data types. If any pair of data types are incompatible then raise an error
         for (int i = 0; i < parameterList->size(); ++i)
         {
           if (parameterList->at(i) != expressionListDataTypes.at(i) && expressionListDataTypes.at(i) != "any" && parameterList->at(i) != "any" && 
@@ -141,6 +143,7 @@ namespace JackCompiler
         if (m_symbolTables.checkClassDefined(token.m_lexeme))
           compilerError("class with the IDENTIFIER has already been defined", m_lexer.getLineNum(), token.m_lexeme);
 
+        //Create a new symbol table for the class
         m_symbolTables.addSymbolTable(SymbolTable(token.m_lexeme));
 
         m_className = token.m_lexeme;
@@ -158,6 +161,7 @@ namespace JackCompiler
             if (m_indexOfNumOfFieldsCode != -1)
               m_outputCode.at(m_indexOfNumOfFieldsCode).append(std::to_string(m_numFieldVariables));
 
+            //Resolve all the symbols that were defined in this class
             resolveSymbols();
             m_numFieldVariables = 0;
           }
@@ -198,6 +202,7 @@ namespace JackCompiler
       
       //peak next token and assume it is a correct type - if it is not the compiler will error appropriately in type()
       std::string newSymbolType = m_lexer.peekNextToken().m_lexeme;
+      //Determine whether the type is a class that has not be encountered before and needs to be resolved in the future
       determineIfNeedsToBeResolved(newSymbolType, Symbol::SymbolKind::CLASS, std::pair<bool, std::vector<std::string>>(false, std::vector<std::string>()));
       type();
       if ((token = m_lexer.getNextToken()).m_tokenType == Token::TokenType::IDENTIFIER)
@@ -306,6 +311,7 @@ namespace JackCompiler
               m_outputCode.push_back("pop pointer 0");
             }
 
+            //If the body of the function does not return a value down all its code paths then raise an error
             if (!body())
               compilerError("Not all code paths in the subroutine contain a return statement", m_lexer.getLineNum(), "}");
 
@@ -395,6 +401,7 @@ namespace JackCompiler
       Token nextToken = m_lexer.peekNextToken();
       while (nextToken.m_lexeme == "var" || nextToken.m_lexeme == "let" || nextToken.m_lexeme == "if" || nextToken.m_lexeme == "while" || nextToken.m_lexeme == "do" || nextToken.m_lexeme == "return")
       {
+        //If all the code paths before the next statement return a value, then the following statements will never be run so raise a warning
         if (m_returnsValue)
           compilerWarning("Code following this point is unreachable and redundant", m_lexer.getLineNum(), nextToken.m_lexeme);
         statement();
@@ -490,6 +497,7 @@ namespace JackCompiler
           compilerError("IDENTIFIER has not been declared", m_lexer.getLineNum(), symbolName);
 
         Token nextToken = m_lexer.peekNextToken();
+        //If the variable being assigned a value is part of an array then place the reference for the location of that variable into the that pointer for later use
         if (nextToken.m_lexeme == "[")
         {
           auto offsetAndKind = m_symbolTables.getOffsetAndKind(symbolName, m_className);
@@ -541,10 +549,12 @@ namespace JackCompiler
             //declare the symbol as being initialised with a value
             m_symbolTables.setSymbolInitialised(symbolName, m_className);
 
+            //If the assigned variable was an element of an array then that location will be pointed at by the 'that' pointer so pop the value into that location
             if (arrayElement)
               m_outputCode.push_back("pop that 0");
             else
             {
+              //Get the offset and kind of symbol in order to generate the correct vm code
               auto offsetAndKind = m_symbolTables.getOffsetAndKind(symbolName, m_className);
 
               if (offsetAndKind.second == Symbol::SymbolKind::FIELD)
@@ -597,7 +607,7 @@ namespace JackCompiler
           }
           m_outputCode.push_back("goto END" + labelCount);
           m_outputCode.push_back("label END" + labelCount);
-
+          //Both the if and else portion of the statement must contain return statements for the whole portion of the code to definitely return a value
           if (ifPortionReturned && elsePortionReturned)
             m_returnsValue = true;
         }
@@ -666,11 +676,13 @@ namespace JackCompiler
       {
         std::string returnedDataType = expression();
 
+        //If the return type of the return statement is not compatible with the return type of the subroutine then raise an error
         if (returnedDataType != m_scopeReturnType && returnedDataType != "any" && !(returnedDataType == "int" && m_scopeReturnType == "char"))
           compilerError("Expected return value to be of type " + m_scopeReturnType + " not " + returnedDataType, m_lexer.getLineNum(), nextToken.m_lexeme);
       }
       else
       {
+        //If the return statement didn't return a value when the subroutine definition indicated it would, raise an error
         if (m_scopeReturnType != "void")
           compilerError("Expected subroutine to return a value of type " + m_scopeReturnType, m_lexer.getLineNum(), nextToken.m_lexeme);
         
@@ -696,6 +708,7 @@ namespace JackCompiler
     Token nextToken = m_lexer.peekNextToken();
     while (nextToken.m_lexeme == "&" || nextToken.m_lexeme == "|")
     {
+      //If two relational expressions are operated upon by AND or OR then the return type must be boolean
       expressionType = "boolean";
       m_lexer.getNextToken();
       relationalExpression();
@@ -722,6 +735,7 @@ namespace JackCompiler
 
           functionName = functionName + "." + token.m_lexeme;
 
+          //If the object has been declared then get its type and make that the prefix of the function call to make in the vm code
           auto operandTypePair = m_symbolTables.getSymbolType(prefixFunctionName, m_className);
           bool found = operandTypePair.first;
           if (found)
@@ -742,6 +756,7 @@ namespace JackCompiler
       }
       else
       {
+        //If the subroutine call only has one identify and no dot operator than a method of the current class must be being called
         callingAMethod = true;
         functionName = m_className + "." + functionName;
       }
@@ -781,6 +796,7 @@ namespace JackCompiler
 
         const std::vector<std::string> expressionListDataTypes = expressionList();
         argumentCount += expressionListDataTypes.size();
+        //Determine if the called function needs to be resolved later and has not already been defined
         determineIfNeedsToBeResolved(functionName, Symbol::SymbolKind::FUNCTION, std::pair<bool, std::vector<std::string>>(true, expressionListDataTypes));
 
         //Compare the expression list against the parameter list
@@ -802,6 +818,7 @@ namespace JackCompiler
 
   const std::vector<std::string> Parser::expressionList()
   {
+    //List of expression data types to return for comparision to parameter list
     std::vector<std::string> expressionListDataTypes;
     Token nextToken = m_lexer.peekNextToken();
     if (isExpression(nextToken))
@@ -937,7 +954,8 @@ namespace JackCompiler
         if (token.m_tokenType == Token::TokenType::IDENTIFIER)
         {
           symbolName = symbolName + "." + token.m_lexeme;
-
+          
+          //If the object has been declared then get its type and make that the prefix of the function call to make in the vm code
           operandTypePair = m_symbolTables.getSymbolType(prefixSymbolName, m_className);
           found = operandTypePair.first;
           if (found)
@@ -959,6 +977,7 @@ namespace JackCompiler
       }
       else if (nextToken.m_lexeme == "(")
       {
+        //If the subroutine call only has one identify and no dot operator than a method of the current class must be being called
         symbolName = m_className + "." + symbolName;
         callingAMethod = true;
       }
@@ -969,6 +988,7 @@ namespace JackCompiler
       if (!m_symbolTables.checkSymbolInitialised(symbolName, m_className) && symbolName.find('.') == std::string::npos)
         compilerWarning("IDENTIFIER has not been initialised", m_lexer.getLineNum(), symbolName);
       
+      //If symbolName has no dot operator in it then it must be a variable of some sort so push that onto the stack
       if (symbolName.find('.') == std::string::npos)
       {
         auto offsetAndKind = m_symbolTables.getOffsetAndKind(symbolName, m_className);
@@ -984,6 +1004,7 @@ namespace JackCompiler
       }
       else
       {
+        //If calling a method then send in the reference to the object as the first argument
         if (callingAMethod)
         {
           auto offsetAndKind = m_symbolTables.getOffsetAndKind(prefixSymbolName, m_className);
@@ -1016,6 +1037,7 @@ namespace JackCompiler
         if (bracketDataType != "int" && bracketDataType != "any")
           compilerError("Expression in brackets does not evaluate as an INT", m_lexer.getLineNum(), "[");
         
+        //If indexing an array then the jack language does not force data types on the values in the array so any type is allowed
         operandType = "any";
 
         Token token = m_lexer.getNextToken();

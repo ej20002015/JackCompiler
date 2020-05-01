@@ -27,6 +27,7 @@ namespace JackCompiler
 
   Token::Token() : m_tokenType(TokenType::NONE), m_lexeme("")
   {
+    //Initialise the mapping between the elements in the enum and their string representation
     m_tokenTypeMapping[TokenType::NONE]            = "NONE";
     m_tokenTypeMapping[TokenType::EOFILE]          = "EOF";
     m_tokenTypeMapping[TokenType::SYMBOL]          = "SYMBOL";

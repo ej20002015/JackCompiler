@@ -11,7 +11,13 @@ namespace JackCompiler
 	class LexerInterface
 	{
 	public:
+    /**
+    * Return the next token in the file and move ahead one token in the file
+    */
 		virtual Token getNextToken() = 0;
+    /**
+    * Return the next token in the file and and stay in the same position in the file
+    */
 		virtual Token peekNextToken() = 0;
 	};
 

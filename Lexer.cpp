@@ -56,9 +56,12 @@ namespace JackCompiler
 
 	Token Lexer::peekNextToken()
 	{
+    //If the next token has been cached by a previous call to peekNextToken then immediately return that
 		if (m_cachedNextToken.m_tokenType != Token::TokenType::NONE)
 			return m_cachedNextToken;
-
+    
+    //Call get next token but make sure the file stream reader doesn't progress through the file. 
+    //Then cache the peeked token so it can be quickly returned if any consecutive calls to peek are made
 		int currentFilePointer = m_fileStream.tellg();
 		Token token = getNextToken();
 		m_fileStream.seekg(currentFilePointer);

@@ -29,6 +29,7 @@ namespace JackCompiler
 		std::map<TokenType, std::string> m_tokenTypeMapping;
 	};
 
+  //Defines how a Token object should be printed to the console
 	inline std::ostream& operator << (std::ostream& out, Token const& token) 
 	{
 		out << "<" << token.m_lexeme << ", " << token.m_tokenTypeMapping.at(token.m_tokenType) << ">";

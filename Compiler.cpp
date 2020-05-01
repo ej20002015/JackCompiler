@@ -91,6 +91,7 @@ namespace JackCompiler
 
 	int Compiler::run(int argc, char** argv)
 	{
+    //Make sure a directory path has been passed in as a command line argument
 		std::string directoryPath = "";
 		if (argc < 2)
 			compilerError("No directory name supplied");
@@ -99,10 +100,12 @@ namespace JackCompiler
 
 		DIR* directory;
 		struct dirent* entry;
+    //Use the dirent library to open the directory
 		directory = opendir(directoryPath.c_str());
 		if (directory == NULL)
 			compilerError("No directory exists with the name \"" + directoryPath + "\"");
 
+    //For each jack file in the directory, add its path to a list
 		for (entry = readdir(directory); entry != NULL; entry = readdir(directory))
 		{
 			std::string fileString = directoryPath + "/" + entry->d_name;
@@ -113,10 +116,9 @@ namespace JackCompiler
 		if (m_filePaths.empty())
 			compilerError("Directory does not contain any jack files");
 
+    //Compile each jack file found in the directory
 		for (std::string filePath : m_filePaths)
-    {
 			compileFile(filePath);
-    }
 
     //if unresolved symbols exist then throw an error
     if (!m_symbolsToBeResolved.empty())
@@ -153,7 +155,7 @@ namespace JackCompiler
 		Parser parser(filePath, m_symbolTables, m_symbolsToBeResolved);
 		parser.parse();
     auto outputCode = parser.getOutputCode();
-    //writeOutputCodeToConsole(outputCode);
+    //Identify the filename of the filePath string without the file extension
     std::string fileName = filePath.substr(filePath.find_last_of("\\/") + 1, filePath.length());
     fileName = fileName.substr(0, fileName.find_last_of("."));
     std::string outputFilePath = filePath.substr(0, filePath.find_last_of("\\/") + 1).append(fileName + ".vm");

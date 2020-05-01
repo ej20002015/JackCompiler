@@ -153,11 +153,13 @@ namespace JackCompiler
 
   void SymbolTables::addSymbolTable(const SymbolTable& newSymbolTable)
   {
+    //Add a new symbol table to the list of symbol tables
     m_symbolTables.push_back(std::make_shared<SymbolTable>(SymbolTable(newSymbolTable)));
   }
 
   void SymbolTables::removeCurrentSymbolTable()
   {
+    //Remove the current symbol table which is located at the end of the list
     m_symbolTables.pop_back();
   }
 
