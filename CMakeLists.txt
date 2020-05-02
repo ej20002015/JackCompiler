@@ -1,6 +1,6 @@
 project("JackCompiler")
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 cmake_minimum_required(VERSION 2.8)
 
